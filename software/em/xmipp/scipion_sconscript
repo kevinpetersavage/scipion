@@ -36,9 +36,9 @@ from datetime import datetime
 Import('env')
 
 
-AddOption('--no-opencv', dest='opencv', action='store_false',
+AddOption('--no-opencv', dest='opencv', action='store_false', default = 'true',
           help='Avoid compilation of opencv programs')
-AddOption('--no-scipy', dest='scipy', action='store_false',
+AddOption('--no-scipy', dest='scipy', action='store_false', default = 'true',
           help='Avoid compilation with scipy support')
 
 
@@ -681,6 +681,10 @@ if opencv:
                   'opencv_video']
 
     addProg('optical_alignment_cpu',
+            libs=opencvLibs,
+            deps=['opencv'])
+    
+    addProg('micrograph_particle_polishing',
             libs=opencvLibs,
             deps=['opencv'])
 

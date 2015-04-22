@@ -39,6 +39,7 @@ moc_*.cc
 # External libs
 applications/programs/*/*
 !applications/programs/*/*.cpp
+!applications/programs/*/*.h
 applications/tests/*/*
 !applications/tests/*/*.cpp
 !applications/tests/*/*.py
