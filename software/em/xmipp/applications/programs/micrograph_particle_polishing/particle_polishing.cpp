@@ -28,7 +28,7 @@
 #include <math.h>
 #include <time.h>
 #include <data/xmipp_filename.h>
-#include "xmipp_fftw.h"
+#include <data/xmipp_fftw.h>
 
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
