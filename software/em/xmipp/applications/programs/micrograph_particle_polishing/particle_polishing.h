@@ -31,17 +31,17 @@
 class ProgParticlePolishing: public XmippProgram
 {
 public:
-	FileName fnPolishedParticles;
-	/// Movie filename
-	FileName fnMovie, fnParticleStack;
-	/// Shifts from Optical Flow
-	FileName fnAvg;
-	// File name for the initial estimated optical flows
-	FileName fnInitFlow;
+    FileName fnPolishedParticles;
+    /// Movie filename
+    FileName fnMovie, fnParticleStack;
+    /// Shifts from Optical Flow
+    FileName fnAvg;
+    // File name for the initial estimated optical flows
+    FileName fnInitFlow;
     /// Particle coordinates from corrected average (Optical Flow)
-	FileName fnparticleCoords;
+    FileName fnparticleCoords;
 
-	/// For reading the input movie and particle coordinates
+    /// For reading the input movie and particle coordinates
     ImageGeneric movieStack;
     MetaData particleCoords;
 
@@ -51,15 +51,15 @@ public:
     MultidimArray<double> particleAvgStack;
     Matrix2D<double> A;
 
-	size_t particleRadius, particleSize;
-	size_t frameNum, particleNum;
-	double shiftLimit, scaleLimit, shearLimit;
+    size_t particleRadius, particleSize;
+    size_t frameNum, particleNum, iterationNum;
+    double shiftLimit, scaleLimit, shearLimit;
 
 public:
 
-	ProgParticlePolishing();
+    ProgParticlePolishing();
 
-	~ProgParticlePolishing();
+    ~ProgParticlePolishing();
 
     /// Read parameters
     void readParams();
@@ -76,8 +76,8 @@ public:
 
     /// Extract a particle from an input frame
     void micExtractParticle(const int x, const int y,
-    		const MultidimArray<double> frameImage,
-			MultidimArray<double> &particleImage);
+                            const MultidimArray<double> frameImage,
+                            MultidimArray<double> &particleImage);
 
     /// To compute the average of each stack
     void computeAvgStack();

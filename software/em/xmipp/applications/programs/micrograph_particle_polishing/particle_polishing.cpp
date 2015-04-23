@@ -28,7 +28,7 @@
 #include <math.h>
 #include <time.h>
 #include <data/xmipp_filename.h>
-#include <data/xmipp_fftw.h>
+#include "xmipp_fftw.h"
 
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
@@ -240,6 +240,7 @@ void ProgParticlePolishing::readParams()
     shiftLimit = getDoubleParam("--shiftLim");
     scaleLimit = getDoubleParam("--scaleLim");
     shearLimit = getDoubleParam("--shearLim");
+    iterationNum = getIntParam("--num_iteration");
 }
 
 void ProgParticlePolishing::defineParams()
@@ -253,6 +254,7 @@ void ProgParticlePolishing::defineParams()
     addParamsLine("  [--shiftLim <shift_limit=3.0>]       : Shift limit for transformation matrix");
     addParamsLine("  --particleSize <size>         : Particle size in pixels");
     addParamsLine("  --coords <coordsfile>         : Particles' coordinates");
+    addParamsLine("  [--iterations <num_iteration=2>]      : Number of iteration for polishing particles");
     addParamsLine("  --flows <flow_rootname>      : Root name for the initial flows");
     //    addParamsLine("  [--thr <p=1>]                 : Number of threads for automatic picking");
     //    addParamsLine("  [--fast]                      : Perform a fast preprocessing of the micrograph (Fourier filter instead of Wavelet filter)");
@@ -413,62 +415,72 @@ void ProgParticlePolishing::particlePolishing3D()
     Matrix1D<double> p, steps;
     MultidimArray<double> particleImg, transparticleImg, particleAvg;
     Image<double> avgImg, Iaux;
+    size_t particleIdx;
     int iter, x, y;
 
-    // Initialize
-    steps.initZeros(6);
-    steps.initConstant(1.);
-    cout<<"OF corrected average is: "<<fnAvg<<endl;
+    // Initialization
+	steps.initZeros(6);
+	steps.initConstant(1.);
     avgImg.read(fnAvg);
-    size_t particleIdx = 0;
-
-    FOR_ALL_OBJECTS_IN_METADATA(particleCoords)
+    for (size_t it=0;it<iterationNum;it++)
     {
-        cout<<"****************************************"<<endl;
-        cout<<"We are processing the particle: "<<particleIdx+1<<endl;
-        particleCoords.getValue(MDL_XCOOR, x, __iter.objId);
-        particleCoords.getValue(MDL_YCOOR, y, __iter.objId);
-        micExtractParticle(x, y, avgImg(), avgParticle);
-        particleAvg.aliasImageInStack(extParticles, particleIdx);
-        particleAvg.initZeros(particleSize, particleSize);
-        for (size_t i=0;i<frameNum;i++)
-        {
-            cout<<"Frame number is: "<<i+1<<endl;
-            fnCurrentStack = fnParticleStack + int2Str(i+1) + ".stk";
-            fnCurrentStackAl = "stack" + int2Str(i+1) + ".stk";
-            particleStack.readMapped(fnCurrentStack, particleIdx+1);
-            particleStack().getImage(currentParticle);
-            p.initZeros(6);
-            p(0) = p(4) = 1.;
-            double cost=1e38;
-            // Compute free transformation
-            powellOptimizer(p, 1, 6, &L1costImage, this, 0.01, cost, iter, steps, false);
-            if (cost == 1e38)
-            	 A.initIdentity(3);
-            else
-            	// Transformation matrix
-            	MAT_ELEM(A,0,0)=p(0);
-				MAT_ELEM(A,0,1)=p(1);
-				MAT_ELEM(A,0,2)=p(2);
-				MAT_ELEM(A,1,0)=p(3);
-				MAT_ELEM(A,1,1)=p(4);
-				MAT_ELEM(A,1,2)=p(5);
-				MAT_ELEM(A,2,0)=0;
-				MAT_ELEM(A,2,1)=0;
-				MAT_ELEM(A,2,2)=1;
-            cout<<"Transformation matrix is "<<endl<<A<<endl;
-            // Apply the best transformation
-            applyGeometry(BSPLINE3, transparticleImg, currentParticle, A, IS_NOT_INV, WRAP);
-            particleAvg += transparticleImg;
-            Iaux() = transparticleImg;
-            Iaux.write(fnCurrentStackAl,ALL_IMAGES,true,WRITE_APPEND);
-        }
-        particleAvg /= double(particleNum);
-        particleIdx++;
+    	cout<<"Iteration number: "<<it<<endl;
+    	particleIdx = 0;
+    	if (fnCurrentStackAl.exists())
+    		fnCurrentStackAl.deleteFile();
+		FOR_ALL_OBJECTS_IN_METADATA(particleCoords)
+		{
+			cout<<"****************************************"<<endl;
+			cout<<"We are processing the particle: "<<particleIdx+1<<endl;
+			if (it == 0)
+			{
+				particleCoords.getValue(MDL_XCOOR, x, __iter.objId);
+				particleCoords.getValue(MDL_YCOOR, y, __iter.objId);
+				micExtractParticle(x, y, avgImg(), avgParticle);
+			}
+			else
+				extParticles.getImage(particleIdx, avgParticle);
+			particleAvg.aliasImageInStack(extParticles, particleIdx);
+			particleAvg.initZeros(particleSize, particleSize);
+			for (size_t i=0;i<frameNum;i++)
+			{
+				cout<<"Frame number is: "<<i+1<<endl;
+				fnCurrentStack = fnParticleStack + int2Str(i+1) + ".stk";
+				fnCurrentStackAl = "stack" + int2Str(i+1) + ".stk";
+				particleStack.readMapped(fnCurrentStack, particleIdx+1);
+				particleStack().getImage(currentParticle);
+				p.initZeros(6);
+				p(0) = p(4) = 1.;
+				double cost=1e38;
+				// Compute free transformation
+				powellOptimizer(p, 1, 6, &L1costImage, this, 0.01, cost, iter, steps, false);
+				if (cost == 1e38)
+					 A.initIdentity(3);
+				else
+					// Transformation matrix
+					MAT_ELEM(A,0,0)=p(0);
+					MAT_ELEM(A,0,1)=p(1);
+					MAT_ELEM(A,0,2)=p(2);
+					MAT_ELEM(A,1,0)=p(3);
+					MAT_ELEM(A,1,1)=p(4);
+					MAT_ELEM(A,1,2)=p(5);
+					MAT_ELEM(A,2,0)=0;
+					MAT_ELEM(A,2,1)=0;
+					MAT_ELEM(A,2,2)=1;
+				cout<<"Transformation matrix is "<<endl<<A<<endl;
+				// Apply the best transformation
+				applyGeometry(BSPLINE3, transparticleImg, currentParticle, A, IS_NOT_INV, WRAP);
+				particleAvg += transparticleImg;
+				Iaux() = transparticleImg;
+				Iaux.write(fnCurrentStackAl, ALL_IMAGES, true, WRITE_APPEND);
+			}
+			particleAvg /= double(particleNum);
+			particleIdx++;
+		}
     }
     // Write the polished particles
     Iaux() = extParticles;
-    Iaux.write(fnPolishedParticles,ALL_IMAGES,true,WRITE_APPEND);
+    Iaux.write(fnPolishedParticles, ALL_IMAGES, true, WRITE_APPEND);
 }
 
 void ProgParticlePolishing::extractAverageParticle()
