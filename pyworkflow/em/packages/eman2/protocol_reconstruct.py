@@ -200,7 +200,7 @@ class EmanProtReconstruct(ProtReconstruct3D):
         if partSet.hasCTF():
             program = getEmanProgram('e2ctf.py')
             acq = partSet.getAcquisition()
-             
+            
             args = " --voltage %3d" % acq.getVoltage()
             args += " --cs %f" % acq.getSphericalAberration()
             args += " --ac %f" % (100 * acq.getAmplitudeContrast())

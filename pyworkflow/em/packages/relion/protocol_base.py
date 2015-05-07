@@ -90,6 +90,7 @@ class ProtRelionBase(EMProtocol):
                   'projections': self.extraIter + '%(half)s_projections.sqlite',
                   'classes_scipion': self.extraIter + 'classes_scipion.sqlite',
                   'model': self.extraIter + 'model.star',
+                  'optimiser': self.extraIter + 'optimiser.star',
                   'angularDist_xmipp': self.extraIter + 'angularDist_xmipp.xmd',
                   'all_avgPmax_xmipp': self._getTmpPath('iterations_avgPmax_xmipp.xmd'),
                   'all_changes_xmipp': self._getTmpPath('iterations_changes_xmipp.xmd'),
@@ -647,7 +648,7 @@ class ProtRelionBase(EMProtocol):
         return program
     
     def _getInputParticles(self):
-        if self.doContinue and not self.inputParticles:
+        if self.doContinue:
             self.inputParticles.set(self.continueRun.get().inputParticles.get())
         return self.inputParticles.get()
     

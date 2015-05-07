@@ -33,9 +33,9 @@ import os
 from os.path import join, exists, dirname, basename
 import time
 try:
-    from ConfigParser import ConfigParser
+    from ConfigParser import ConfigParser, ParsingError
 except ImportError:
-    from configparser import ConfigParser  # Python 3
+    from configparser import ConfigParser, ParsingError  # Python 3
 
 
 __version__ = 'v.0.1.5 Phosphorus'
@@ -77,7 +77,10 @@ SCIPION_HOSTS = join(dirname(SCIPION_CONFIG), 'hosts.conf')
 if SCIPION_LOCAL_CONFIG != SCIPION_CONFIG and exists(SCIPION_LOCAL_CONFIG):
     cf = ConfigParser()
     cf.optionxform = str  # keep case (stackoverflow.com/questions/1611799)
-    cf.read(SCIPION_LOCAL_CONFIG)
+    try:
+        cf.read(SCIPION_LOCAL_CONFIG)
+    except ParsingError:
+        sys.exit("%s\nPlease fix the configuration file." % sys.exc_info()[1])
     if 'BUILD' in cf.sections():
         print("""***
 Warning: you seem to be running Scipion with the old (pre-April 9 2015)
@@ -232,6 +235,7 @@ MODE_STATS = 'stats'
 MODE_ENV = 'printenv'
 MODE_RUN = 'run'
 MODE_TUTORIAL = 'tutorial'
+MODE_DEPENDENCIES = 'deps'
 
 
 def main():
@@ -369,7 +373,7 @@ def main():
                 if fname.startswith('xmipp.') and fname.endswith('.template'):
                     out = join(PACKAGES['XMIPP_HOME'], fname[:-len('.template')])
                     if exists(out):
-                        print(yellow("File %s exists -- keeping it." % out))
+                        print(yellow("Keeping existing file: %s" % out))
                         continue
                     print(yellow("Writing sourceable shell file: %s" % out))
                     open(out, 'w').write(open(join(tDir, fname)).read() % VARS)
@@ -382,8 +386,9 @@ def main():
             # Install external libraries and compile Xmipp
             ret = build(args[1:]) # ignore the --binary argument
             if ret == 0:
-                ret = os.system('scripts/change_rpath.py %s/bin %s/lib'
-                                % (SCIPION_SOFTWARE, SCIPION_SOFTWARE))
+                ret = os.system(
+                    'scripts/change_rpath.py %(ss)s/bin %(ss)s/lib %(ss)s/em'
+                    % {'ss': SCIPION_SOFTWARE})
         else:
             # Install external libraries and compile Xmipp
             ret = build(args)
@@ -442,6 +447,10 @@ def main():
 
     elif mode == MODE_TUTORIAL:
         runApp('pw_tutorial.py', sys.argv[2:])
+
+    elif mode == MODE_DEPENDENCIES:
+        runScript('scripts/find_deps.py software/bin software/lib %s'
+                  % ' '.join(['"%s"' % arg for arg in sys.argv[2:]]))
 
     elif mode == MODE_HELP:
         sys.stdout.write("""\
@@ -518,4 +527,4 @@ if __name__ == '__main__':
         main()
     except Exception:
         # This way of catching exceptions works with Python 2 & 3
-        sys.stderr.write('Error: %s\n' % sys.exc_info()[1])
+        sys.exit('Error: %s\n' % sys.exc_info()[1])

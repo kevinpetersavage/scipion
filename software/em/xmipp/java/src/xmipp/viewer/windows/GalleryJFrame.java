@@ -746,7 +746,8 @@ public class GalleryJFrame extends JFrame implements iCTFGUI
 	private void goToImage(int index)
 	{
 		gallery.gotoItem(index);
-		makeVisible(index, 0);
+		Point coords = gallery.getCoords(index);
+		makeVisible(coords.y, coords.x);
 	}
 
 	
@@ -1360,8 +1361,8 @@ public class GalleryJFrame extends JFrame implements iCTFGUI
 		if (gallery.data.isGalleryMode() && row * table.getColumnCount() + col + 1 > gallery.getSize())
 		{
 			Point coords = gallery.getCoords(gallery.getSize() - 1);
-			row = coords.x;
-			col = coords.y;
+			row = coords.y;
+			col = coords.x;
 		}
 		gallery.clearSelection();
 		gallery.touchItem(row, col);
@@ -1475,7 +1476,7 @@ public class GalleryJFrame extends JFrame implements iCTFGUI
 			addItem(FILE_OPEN, "Open ...", null, "control released O");
 			addItem(FILE_OPENWITH_IJ, "Open with ImageJ", "ij.gif", "control released J");
 			addItem(FILE_OPENWITH_CHIMERA, "Open with Chimera", "chimera.gif", "control released H");
-			addItem(FILE_OPENMICROGRAPHS, "Open particle micrographs");
+			addItem(FILE_OPENMICROGRAPHS, "Open colored particles");
 			addItem(FILE_INFO, "File info ...");
                         
 
@@ -1578,7 +1579,7 @@ public class GalleryJFrame extends JFrame implements iCTFGUI
 			String cmd = evt.getActionCommand();
 			try
 			{
-                                if (cmd.equals(DISPLAY_INVERTY))
+                if (cmd.equals(DISPLAY_INVERTY))
 				{
 					gallery.setInvertY(getItemSelected(DISPLAY_INVERTY));
 				}

@@ -23,7 +23,6 @@
 # *  e-mail address 'xmipp@cnb.csic.es'
 # *
 # **************************************************************************
-from pyworkflow.em.packages.xmipp3.convert import locationToXmipp
 """
 This sub-package contains protocols for performing subtomogram averaging.
 """
@@ -32,6 +31,8 @@ import pyworkflow.object as pwobj
 from pyworkflow.em import *  
 from xmipp import MetaData, MDL_ANGLE_ROT, MDL_SHIFT_Z
 from xmipp3 import HelicalFinder
+from pyworkflow.em.packages.xmipp3.convert import getImageLocation
+
 
 class XmippProtHelicalParameters(ProtPreprocessVolumes, HelicalFinder):
     """ Estimate helical parameters and symmetrize.
@@ -44,51 +45,53 @@ class XmippProtHelicalParameters(ProtPreprocessVolumes, HelicalFinder):
         form.addSection(label='General parameters')
         form.addParam('inputVolume', PointerParam, pointerClass="Volume", label='Input volume')
         form.addParam('cylinderRadius',IntParam,label='Cylinder radius', default=-1,
-                      help="The helix is supposed to occupy the this radius around the Z axis. Leave it as -1 for symmetrizing the whole volume")
+                      help="The helix is supposed to occupy this radius in voxels around the Z axis. Leave it as -1 for symmetrizing the whole volume")
         form.addParam('dihedral',BooleanParam,default=False,label='Apply dihedral symmetry')
 
         form.addSection(label='Search limits')
         form.addParam('rot0',FloatParam,default=0,label='Minimum rotational angle',help="In degrees")
-        form.addParam('rotF',FloatParam,default=360,label='Maximum tilt angle',help="In degrees")
+        form.addParam('rotF',FloatParam,default=360,label='Maximum rotational angle',help="In degrees")
         form.addParam('rotStep',FloatParam,default=5,label='Angular step',help="In degrees")
         form.addParam('z0',FloatParam,default=0,label='Minimum shift Z',help="In voxels")
         form.addParam('zF',FloatParam,default=10,label='Maximum shift Z',help="In voxels")
         form.addParam('zStep',FloatParam,default=0.5,label='Shift step',help="In voxels")
         self.deltaZ=Float()
         self.deltaRot=Float()
+        form.addParallelSection(threads=4, mpi=0)
 
     #--------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
+        self._insertFunctionStep('copyInput')
         self._insertFunctionStep('coarseSearch')
         self._insertFunctionStep('fineSearch')
         self._insertFunctionStep('symmetrize')
-        if self.dihedral.get():
-            self._insertFunctionStep('applyDihedral')
         self._insertFunctionStep('createOutput')
-        self.fnVol=locationToXmipp(*self.inputVolume.get().getLocation())
+        self.fnVol = getImageLocation(self.inputVolume.get())
+        self.fnVolSym=self._getPath('volume_symmetrized.vol')
         [self.height,_,_]=self.inputVolume.get().getDim()
     
     #--------------------------- STEPS functions --------------------------------------------
+    def copyInput(self):
+        if self.dihedral:
+            self.runJob("xmipp_transform_symmetrize","-i %s -o %s --sym dihedral" % (self.fnVol, self.fnVolSym))
+        else:
+            ImageHandler().convert(self.inputVolume.get(), self.fnVolSym)
+                        
     def coarseSearch(self):
-        self.runCoarseSearch(self.fnVol,float(self.z0.get()),float(self.zF.get()),float(self.zStep.get()),
+        self.runCoarseSearch(self.fnVol,self.dihedral.get(),float(self.z0.get()),float(self.zF.get()),float(self.zStep.get()),
                              float(self.rot0.get()),float(self.rotF.get()),float(self.rotStep.get()),
                              self.numberOfThreads.get(),self._getExtraPath('coarseParams.xmd'),
                              int(self.cylinderRadius.get()),int(self.height))
 
     def fineSearch(self):
-        self.runFineSearch(self.fnVol, self._getExtraPath('coarseParams.xmd'), self._getExtraPath('fineParams.xmd'), 
+        self.runFineSearch(self.fnVol, self.dihedral.get(), self._getExtraPath('coarseParams.xmd'), self._getExtraPath('fineParams.xmd'), 
                            float(self.z0.get()),float(self.zF.get()),float(self.rot0.get()),float(self.rotF.get()),
                              int(self.cylinderRadius.get()),int(self.height))
 
     def symmetrize(self):
-        self.runSymmetrize(self.fnVol, self._getExtraPath('fineParams.xmd'), self._getPath('volume_symmetrized.vol'), 
+        self.runSymmetrize(self.fnVolSym, self.dihedral.get(), self._getExtraPath('fineParams.xmd'), self.fnVolSym, 
                            self.cylinderRadius.get(), self.height)
 
-    def applyDihedral(self):
-        self.runApplyDihedral(self._getPath('volume_symmetrized.vol'),self._getExtraPath('fineParams.xmd'),
-                              self._getTmpPath('volume_rotated.vol'),
-                              self.cylinderRadius.get(), self.height)
-    
     def createOutput(self):
         volume = Volume()
         volume.setFileName(self._getPath('volume_symmetrized.vol'))

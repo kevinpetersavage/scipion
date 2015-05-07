@@ -138,13 +138,15 @@ Examples:
         group = form.addGroup('Particles')
         if self.protocol.IS_CLASSIFY:
 
-            group.addParam('showImagesInClasses', LabelParam, default=True,
+            group.addParam('showImagesInClasses', LabelParam, 
                           label='Particles assigned to each Class',
                           help='Display the classes and the images associated.')
             changesLabel = 'Changes in Offset, Angles and Classes'
         else:
-            group.addParam('showImagesAngularAssignment', LabelParam, default=True,
+            group.addParam('showImagesAngularAssignment', LabelParam, 
                            label='Particles angular assignment')
+        group.addParam('showOptimiserFile', LabelParam, 
+                       label='Show optimizer file')
         
         if self.protocol.IS_3D:
             group = form.addGroup('Volumes')
@@ -206,6 +208,7 @@ Examples:
         self._load()
         return {'showImagesInClasses': self._showImagesInClasses,
                 'showImagesAngularAssignment' : self._showImagesAngularAssignment,
+                'showOptimiserFile': self._showOptimiserFile,
                 'showLL': self._showLL,
                 'showPMax': self._showPMax,
                 'showChanges': self._showChanges,
@@ -240,7 +243,6 @@ Examples:
 # showImagesAngularAssignment     
 #===============================================================================
     def _showImagesAngularAssignment(self, paramName=None):
-        
         views = []
         
         for it in self._iterations:
@@ -250,6 +252,14 @@ Examples:
         
         return views
     
+    def _showOptimiserFile(self,  paramName=None):
+        views = []
+        
+        for it in self._iterations:
+            optimiserFile = self.protocol._getFileName('optimiser', iter=it)
+            v = self.createDataView(optimiserFile)
+            views.append(v)
+        return views
 #=====================================================================
 # showLLRelion
 #=====================================================================
@@ -543,7 +553,8 @@ Examples:
         ViewClass = em.ClassesView if self.protocol.IS_2D else em.Classes3DView
         view = ViewClass(self._project,
                           self.protocol.strId(), filename, other=inputParticlesId,
-                          env=self._env, viewParams=viewParams)
+                          env=self._env,
+                          viewParams=viewParams)
 
         return view
 
@@ -557,7 +568,8 @@ Examples:
                       }
         return em.ObjectView(self._project, 
                           self.protocol.strId(), filename, other=inputParticlesId,
-                          env=self._env, viewParams=viewParams)
+                          env=self._env,
+                          viewParams=viewParams)
 
     def _load(self):
         """ Load selected iterations and classes 3D for visualization mode. """
@@ -631,7 +643,8 @@ class PostprocessViewer(ProtocolViewer):
         ProtocolViewer.setProtocol(self, protocol)
         self.__defineParams(self._form)
         self._createVarsFromDefinition()
-        self._env = os.environ.copy()
+        from pyworkflow.em.packages.xmipp3 import getEnviron
+        self._env = dict(getEnviron())
 #        self._load()
         
     def _defineParams(self, form):

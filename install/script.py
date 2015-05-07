@@ -42,6 +42,17 @@ noScipy = '--no-scipy' in sys.argv or not get('SCIPY')
 #  *                                                                      *
 #  ************************************************************************
 
+cmake = env.addLibrary(
+    'cmake',
+    tar='cmake-3.2.2.tgz',
+    targets=[env.getBin('cmake')],
+    commands=[('cd software/tmp/cmake-3.2.2; '
+               './bootstrap --prefix=../.. --parallel=%d' % env.getProcessors(),
+               'software/tmp/cmake-3.2.2/Makefile'),
+              ('cd software/tmp/cmake-3.2.2; make install -j %d'
+               % env.getProcessors(), 'software/bin/cmake')],
+    default=False)
+
 # In order to get both the float and double libraries of fftw
 # we need to execute ./configure; make; make install twice
 # see: http://www.fftw.org/fftw2_doc/fftw_6.html
@@ -77,7 +88,6 @@ tk = env.addLibrary(
     libChecks=['xft'],
     flags=osFlags,
     deps=[tcl])
-
 
 # Special case: tk does not make the link automatically, go figure.
 tk_wish = env.addTarget('tk_wish')
@@ -128,23 +138,6 @@ python = env.addLibrary(
     flags=['--enable-shared'],
     deps=[sqlite, tk, zlib])
 
-lapack = env.addLibrary(
-    'lapack',
-    tar='lapack-3.5.0.tgz',
-    flags=['-DBUILD_SHARED_LIBS:BOOL=ON',
-           '-DLAPACKE:BOOL=ON'],
-    cmake=True, 
-    default=False)
-# TODO: add check for gfortran
-
-opencv = env.addLibrary(
-    'opencv',
-    tar='opencv-2.4.9.tgz',
-    targets=[env.getLib('opencv_core')],
-    cmake=True,
-    default=not noOpencv)
-
-# ---------- Libraries required by PyTom 
 pcre = env.addLibrary(
     'pcre',
     tar='pcre-8.36.tgz',
@@ -158,6 +151,37 @@ swig = env.addLibrary(
     makeTargets=['Source/Swig/tree.o'],
     deps=[pcre],
     default=False)
+
+sh_alignment = env.addLibrary(
+    'sh_alignment',
+    tar='sh_alignment.tgz',
+    commands=[('cd software/tmp/sh_alignment; make install',
+               'software/lib/python2.7/site-packages/sh_alignment/frm.py')],
+    deps=[python, swig])
+
+lapack = env.addLibrary(
+    'lapack',
+    tar='lapack-3.5.0.tgz',
+    flags=['-DBUILD_SHARED_LIBS:BOOL=ON',
+           '-DLAPACKE:BOOL=ON'],
+    cmake=True,
+    neededProgs=['gfortran'],
+    default=False)
+# TODO: add check for gfortran
+
+if get('CUDA'):
+    opencvFlags = ['-DWITH_CUDA:BOOL=ON']
+else:
+    opencvFlags = ['-DWITH_CUDA:BOOL=OFF']
+opencv = env.addLibrary(
+    'opencv',
+    tar='opencv-2.4.9.tgz',
+    targets=[env.getLib('opencv_core')],
+    flags=opencvFlags,
+    cmake=True,
+    default=not noOpencv)
+
+# ---------- Libraries required by PyTom 
 
 boost = env.addLibrary(
     'boost',

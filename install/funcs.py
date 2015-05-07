@@ -1,8 +1,8 @@
 # **************************************************************************
 # *
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
+# * Authors: J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
 # *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * Unidad de Bioinformatica of Centro Nacional de Biotecnologia, CSIC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'xmipp@cnb.csic.es'
+# *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
 
@@ -29,18 +29,13 @@ import os
 import sys
 import time
 from glob import glob
-
 from subprocess import STDOUT, call
-#Python 3 compatibility: How to overcome Python NameError: name 'basestring' is not defined
+
 try:
     unicode = unicode
-except NameError:
-    # 'unicode' is undefined, must be Python 3
+except NameError:  # 'unicode' is undefined, must be Python 3
     unicode = str
-    basestring = (str,bytes)
-else:
-    # 'unicode' exists, must be Python 2
-    basestring = basestring
+    basestring = (str, bytes)
 
 # Then we get some OS vars
 MACOSX = (platform.system() == 'Darwin')
@@ -73,12 +68,12 @@ def checkLib(lib, target=None):
                    stdout=open(os.devnull, 'w'), stderr=STDOUT)
         if ret != 0:
             raise OSError
-    except OSError, e:
+    except OSError:
         try:
             ret = call(['%s-config' % lib, '--cflags'])
             if ret != 0:
                 raise OSError
-        except OSError, e:
+        except OSError:
             print("""
   ************************************************************************
     Warning: %s not found. Please consider installing it first.
@@ -156,8 +151,8 @@ class Target:
         self._name = name
         self._default = kwargs.get('default', False)
         self._commandList = list(commands)  # copy the list/tuple of commands
-        self._finalCommands = [] # This commands results will be used to check if need to re-build 
-        self._deps = [] # list of name of dependency targets
+        self._finalCommands = [] # their targets will be used to check if we need to re-build
+        self._deps = [] # names of dependency targets
 
     def addCommand(self, cmd, **kwargs):
         if isinstance(cmd, Command):
@@ -276,7 +271,8 @@ class Environment:
             elif isinstance(d, Target):
                 targetName = d.getName()
             else:
-                raise Exception("Dependencies should be either string or Target, received: %s" % d)
+                raise Exception("Dependencies should be either string or "
+                                "Target, received: %s" % d)
 
             if targetName not in self._targetDict:
                 raise Exception("Dependency '%s' does not exists. " % targetName)
@@ -322,11 +318,10 @@ class Environment:
     def addLibrary(self, name, **kwargs):
         """Add library <name> to the construction process.
 
-        This pseudobuilder checks that the needed programs are in PATH,
-        downloads the given url, untars the resulting tar file, configures
-        the library with the given flags, compiles it (in the given
-        buildDir) and installs it. It also tells SCons about the proper
-        dependencies (deps).
+        Checks that the needed programs are in PATH, needed libraries
+        can be found, downloads the given url, untars the resulting
+        tar file, configures the library with the given flags,
+        compiles it (in the given buildDir) and installs it.
 
         If default=False, the library will not be built.
 
@@ -339,6 +334,17 @@ class Environment:
         targets = kwargs.get('targets', [self.getLib(name)])
         clean = kwargs.get('clean', False) # Execute make clean at the end??
         cmake = kwargs.get('cmake', False) # Use cmake instead of configure??
+        default = kwargs.get('default', True)
+        neededProgs = kwargs.get('neededProgs', [])
+        libChecks = kwargs.get('libChecks', [])
+
+        if default or name in sys.argv[2:]:
+            # Check that we have the necessary programs and libraries in place.
+            for prog in neededProgs:
+                assert progInPath(prog), ("Cannot find necessary program: %s\n"
+                                          "Please install and try again" % prog)
+            for lib in libChecks:
+                checkLib(lib)
 
         # If passing a command list (of tuples (command, target)) those actions
         # will be performed instead of the normal ./configure / cmake + make
@@ -356,16 +362,19 @@ class Environment:
         if commands:
             for cmd, tgt in commands:
                 t.addCommand(cmd, targets=tgt, final=True)
+                # Note that we don't use cwd=t.buildDir, so paths are
+                # relative to SCIPION_HOME.
             return t
 
         # If we didnt' specify the commands, we can either compile
         # with autotools (so we have to run "configure") or cmake.
+
+        environ = os.environ.copy()
+        environ.update({'CPPFLAGS': '-I%s/include' % prefix,
+                        'LDFLAGS': '-L%s/lib' % prefix})
         if not cmake:
             flags.append('--prefix=%s' % prefix)
             flags.append('--libdir=%s/lib' % prefix)
-
-            environ = os.environ.update({'CPPFLAGS': '-I%s/include' % prefix,
-                                         'LDFLAGS': '-L%s/lib' % prefix})
             t.addCommand('./configure %s' % ' '.join(flags),
                          targets=makeFile, cwd=configPath,
                          out='%s/log/%s_configure.log' % (prefix, name),
@@ -375,9 +384,9 @@ class Environment:
                                          "it in your system first.")
             flags.append('-DCMAKE_INSTALL_PREFIX:PATH=%s .' % prefix)
             t.addCommand('cmake %s' % ' '.join(flags),
-                         targets=makeFile,
-                         cwd=configPath,
-                         out='%s/log/%s_cmake.log' % (prefix, name))
+                         targets=makeFile, cwd=configPath,
+                         out='%s/log/%s_cmake.log' % (prefix, name),
+                         environ=environ)
 
         t.addCommand('make -j %d' % self._processors,
                      cwd=t.buildPath,
@@ -408,6 +417,17 @@ class Environment:
         # Use reasonable defaults.
         targets = kwargs.get('targets', [name])
         flags = kwargs.get('flags', [])
+        default = kwargs.get('default', True)
+        neededProgs = kwargs.get('neededProgs', [])
+        libChecks = kwargs.get('libChecks', [])
+
+        if default or name in sys.argv[2:]:
+            # Check that we have the necessary programs and libraries in place.
+            for prog in neededProgs:
+                assert progInPath(prog), ("Cannot find necessary program: %s\n"
+                                          "Please install and try again" % prog)
+            for lib in libChecks:
+                checkLib(lib)
         
         deps = kwargs.get('deps', [])
         deps.append('python')
@@ -431,9 +451,14 @@ class Environment:
     #               'CFLAGS="-I%(root)s/include" LDFLAGS="-L%(root)s/lib" '
     # The CFLAGS line is commented out because even if it is needed for modules
     # like libxml2, it causes problems for others like numpy and scipy (see for
-    # example http://mail.scipy.org/pipermail/scipy-user/2007-January/010773.html)
+    # example https://github.com/numpy/numpy/issues/2411
 
-    # TODO: actually, to compile against numpy (as cryoem does), one
+    # Yes, that behavior of numpy is *crazy*. We now modify the
+    # original source, and it should be safe to use our CFLAGS and
+    # LDFLAGS. TODO: actually use them again, and check that all the
+    # compilation works fine.
+
+    # TODO: to compile against numpy (as cryoem does), one
     # needs to have:
     #   software/lib/python2.7/site-packages/numpy/core/include
     #   software/lib/python2.7/site-packages/numpy/core/include/numpy
@@ -451,29 +476,28 @@ class Environment:
                    final=True)
 
         return t
-    
+
     def addPackage(self, name, **kwargs):
-        """ This function download a package tar.gz, untar it and 
-        create a link in software/em.
+        """ Download a package tgz, untar it and create a link in software/em.
         Params in kwargs:
             tar: the package tar file, by default the name + .tgz
-            commands: a list with action to be executed to install the package
+            commands: a list with actions to be executed to install the package
         """
         # We reuse the download and untar from the addLibrary method
         # and pass the createLink as a new command 
         tar = kwargs.get('tar', '%s.tgz' % name)
         packageDir = tar.rsplit('.tar.gz', 1)[0].rsplit('.tgz', 1)[0]
-        
+
         libArgs = {'downloadDir': os.path.join('software', 'em'),
                    'urlSuffix': 'em',
                    'default': False} # This will be updated with value in kwargs
         libArgs.update(kwargs)
-        
+
         target = self._addDownloadUntar(name, **libArgs)
         target.addCommand(Command(self, Link(name, packageDir),
-                             targets=[self.getEm(name), 
-                                      self.getEm(packageDir)],
-                             cwd=self.getEm('')),
+                                  targets=[self.getEm(name),
+                                           self.getEm(packageDir)],
+                                  cwd=self.getEm('')),
                           final=True)
         commands = kwargs.get('commands', [])
         for cmd, tgt in commands:
@@ -481,12 +505,12 @@ class Environment:
                 tgt = [tgt]
             # Take all package targets relative to package build dir
             target.addCommand(cmd, targets=[os.path.join(target.buildPath, t) 
-                                            for t in tgt], 
-                         cwd=target.buildPath, 
-                         final=True)            
+                                            for t in tgt],
+                              cwd=target.buildPath,
+                              final=True)
 
         return target
-    
+
     def _showTargetGraph(self, targetList):
         """ Traverse the targets taking into account
         their dependences and print them in DOT format.
@@ -542,6 +566,10 @@ class Environment:
         cmdTargets = [a for a in self._args[2:] if a[0].isalpha() and not a.startswith('xmipp')]
 
         if cmdTargets:
+            # Check that they are all command targets
+            for t in cmdTargets:
+                if t not in self._targetDict:
+                    raise RuntimeError("Unknown target: %s" % t)
             # Grab the targets passed in the command line
             targetList = [self._targetDict[t] for t in cmdTargets]
         else:
