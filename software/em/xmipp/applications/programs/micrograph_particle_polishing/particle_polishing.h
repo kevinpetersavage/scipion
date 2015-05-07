@@ -54,6 +54,7 @@ public:
     size_t particleRadius, particleSize;
     size_t frameNum, particleNum, iterationNum;
     double shiftLimit, scaleLimit, shearLimit;
+    std::vector< Matrix1D<double> > transformationVec;
 
 public:
 
