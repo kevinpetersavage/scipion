@@ -28,6 +28,7 @@
 #include <math.h>
 #include <time.h>
 #include <data/xmipp_filename.h>
+#include <reconstruction/ctf_phase_flip.h>
 #include "data/xmipp_fftw.h"
 
 #include "opencv2/core/core.hpp"
@@ -215,7 +216,7 @@ void opencv2Xmipp(const Mat &opencvMat, MultidimArray<double> &xmippArray)
 // Converts an OpenCV float matrix to an OpenCV Uint8 matrix
 void convert2Uint8(Mat opencvDoubleMat, Mat &opencvUintMat)
 {
-    Point minLoc,maxLoc;
+    cv::Point minLoc,maxLoc;
     double min,max;
     cv::minMaxLoc(opencvDoubleMat, &min, &max, &minLoc, &maxLoc, noArray());
     opencvDoubleMat.convertTo(opencvUintMat, CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
@@ -345,8 +346,9 @@ void ProgParticlePolishing::extractParticels()
     // Stack for particles of a frame
     MultidimArray<double> particlesStack, avgParticleImage;
     Image<double> Iaux;
+    CTFDescription ctf;
     // Stack filename for particles in a frame
-    FileName fnCurrentStack;
+    FileName fnCurrentStack, fnCTFDescr;
     FileName fnFlowX, fnFlowY;
 
     // OpenCV structures
@@ -385,6 +387,11 @@ void ProgParticlePolishing::extractParticels()
         // Read particles of each frame
         size_t particleIdx = 0;
         fnCurrentStack = fnParticleStack + int2Str(i+1) + ".stk";
+        fnCTFDescr = fnMovie.removeLastExtension() + "-aligned/xmipp_ctf.ctfparam";
+        ctf.clear();
+        ctf.read(fnCTFDescr);
+        ctf.produceSideInfo();
+        actualPhaseFlip(frameImg,ctf);
         FOR_ALL_OBJECTS_IN_METADATA(particleCoords)
         {
             // The position of the particle in the average image
