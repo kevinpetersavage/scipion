@@ -33,6 +33,7 @@
 #include <math.h>
 #include <time.h>
 #include <data/xmipp_filename.h>
+#include <reconstruction/ctf_phase_flip.h>
 #include "data/xmipp_fftw.h"
 
 #include "opencv2/core/core.hpp"
@@ -206,12 +207,13 @@ void opencv2Xmipp(const Mat &opencvMat, MultidimArray<double> &xmippArray) {
 }
 
 // Converts an OpenCV float matrix to an OpenCV Uint8 matrix
-void convert2Uint8(Mat opencvDoubleMat, Mat &opencvUintMat) {
-	Point minLoc, maxLoc;
-	double min, max;
-	cv::minMaxLoc(opencvDoubleMat, &min, &max, &minLoc, &maxLoc, noArray());
-	opencvDoubleMat.convertTo(opencvUintMat, CV_8U, 255.0 / (max - min),
-			-min * 255.0 / (max - min));
+
+void convert2Uint8(Mat opencvDoubleMat, Mat &opencvUintMat)
+{
+    cv::Point minLoc,maxLoc;
+    double min,max;
+    cv::minMaxLoc(opencvDoubleMat, &min, &max, &minLoc, &maxLoc, noArray());
+    opencvDoubleMat.convertTo(opencvUintMat, CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
 }
 
 // Implementation of the particle polishing class
@@ -365,16 +367,20 @@ void ProgParticlePolishing::random_noise_areas(const MultidimArray<double> frame
 	}
 }
 
-void ProgParticlePolishing::computeAvgStack() {
+
+void ProgParticlePolishing::computeAvgStack()
+{
 	FileName fnCurrentStack;
 	MultidimArray<double> particleAvg, particleImg;
 	ImageGeneric particleStack;
 
-	for (size_t i = 0; i < particleNum; i++) {
+	for (size_t i = 0; i < particleNum; i++)
+	{
 		// Set average to zero at the beginning of each iteration
 		particleAvg.aliasImageInStack(particleAvgStack, i);
 		particleAvg.initZeros(particleSize, particleSize);
-		for (size_t j = 0; j < frameNum; j++) {
+		for (size_t j = 0; j < frameNum; j++)
+		{
 			fnCurrentStack = fnParticleStack + int2Str(j + 1) + ".stk";
 			particleStack.readMapped(fnCurrentStack, i + 1);
 			particleStack().getImage(particleImg);
@@ -384,105 +390,83 @@ void ProgParticlePolishing::computeAvgStack() {
 	}
 }
 
-void ProgParticlePolishing::extractParticels() {
-	int x, y, shiftedX, shiftedY;
-// For reading each frame from the movie
-	MultidimArray<double> frameImg, particleImg, avgImage, avgImage2;
-	Mat frameImgOpenCV, avgImgOpenCV;
-
-// Stack for particles of a frame
-	Image<double> Iaux;
-	Image<double> Iaux2;
-
-// Stack filename for particles in a frame
-	FileName fnCurrentStack;
-	FileName fnFlowX, fnFlowY;
-
-// OpenCV structures
-// Matrices for computing optical flow
-	Mat flowX, flowY, flow;
-// Equal 8 bit images for average and current frame for optical flow
-	Mat frameImg8, avgImg8;
-
-	std::cerr << "Step 1: Extracting particles from the frames" << std::endl;
-// Read the OF corrected average
-	Iaux.read(fnAvg);
-	avgImage = Iaux();
-
-	Iaux2.read(fnAvg);
-	avgImage2 = Iaux2();
-// Convert the XMIPP array format to OpenCV matrix format
-xmipp2Opencv(avgImage2, avgImgOpenCV);
-convert2Uint8(avgImgOpenCV, avgImg8);
-// Read each frame of the movie
-/////////////////////////////////////
-for (size_t i=0;i<frameNum;i++)
-//for (size_t i=0;i<2;i++)
+void ProgParticlePolishing::extractParticels()
 {
-	MultidimArray<double> noiseImage;
-	FileName fnnoiseImage;
+    int x, y, shiftedX, shiftedY;
+    // For reading each frame from the movie
+    MultidimArray<double> frameImg, particleImg, avgImage;
+    Mat frameImgOpenCV, avgImgOpenCV;
+    // Stack for particles of a frame
+    MultidimArray<double> particlesStack, avgParticleImage;
+    Image<double> Iaux;
+    CTFDescription ctf;
+    // Stack filename for particles in a frame
+    FileName fnCurrentStack, fnCTFDescr;
+    FileName fnFlowX, fnFlowY;
 
-	MultidimArray<double> noiseStack;
-	MultidimArray<double> particlesStack;
+    // OpenCV structures
+    // Matrices for computing optical flow
+    Mat flowX, flowY, flow;
+    // Equal 8 bit images for average and current frame for optical flow
+    Mat frameImg8, avgImg8;
 
-	std::cerr << "Extracting particles from frame " << i + 1 << std::endl;
-	// Allocate memory for the particles in the current frame
-	particlesStack.resize(particleNum, 1, particleSize, particleSize);
+    std::cerr<<"Step 1: Extracting particles from the frames"<<std::endl;
+    // Read the OF corrected average
+    Iaux.read(fnAvg);
+    avgImage = Iaux();
+    // Convert the XMIPP array format to OpenCV matrix format
+    xmipp2Opencv(avgImage, avgImgOpenCV);
+    convert2Uint8(avgImgOpenCV, avgImg8);
+    // Read each frame of the movie
+    for (size_t i=0;i<frameNum;i++)
+    {
+        std::cerr<<"Extracting particles from frame "<<i+1<<std::endl;
+        // Allocate memory for the particles in the current frame
+        particlesStack.resize(particleNum, 1, particleSize, particleSize);
+        movieStack.readMapped(fnMovie,i+1);
+        movieStack().getImage(frameImg);
+        xmipp2Opencv(frameImg, frameImgOpenCV);
+        convert2Uint8(frameImgOpenCV, frameImg8);
 
-	movieStack.readMapped(fnMovie, i + 1);
-	movieStack().getImage(frameImg);
+        /* Reload the initial shifts between the current frame and the average
+        fnFlowX = fnInitFlow + "x" + int2Str(i) + ".mat";
+        fnFlowY = fnInitFlow + "y" + int2Str(i) + ".mat";
+        readMat(fnFlowX.c_str(), flowX);
+        readMat(fnFlowY.c_str(), flowY);
+        mergeFlows(flowX, flowY, flow);*/
 
-	random_noise_areas(frameImg,  noiseStack);
-
-
-
-	//////////////////////////////////////////////////
-	xmipp2Opencv(frameImg, frameImgOpenCV);
-	convert2Uint8(frameImgOpenCV, frameImg8);
-
-	//Reload the initial shifts between the current frame and the average
-	fnFlowX = fnInitFlow + "x" + int2Str(i) + ".mat";
-	fnFlowY = fnInitFlow + "y" + int2Str(i) + ".mat";
-	readMat(fnFlowX.c_str(), flowX);
-	readMat(fnFlowY.c_str(), flowY);
-	mergeFlows(flowX, flowY, flow);
-
-	// Compute the shifts between the corrected average and current frame
-	calcOpticalFlowFarneback(avgImg8, frameImg8, flow, 0.5, 6, 150, 1, 5, 1.1, 0);
-	// Read particles of each frame
-	size_t particleIdx = 0;
-	fnCurrentStack = fnParticleStack + int2Str(i+1) + ".stk";
-	FOR_ALL_OBJECTS_IN_METADATA(particleCoords)
-	{
-		 // The position of the particle in the average image
-		 particleCoords.getValue(MDL_XCOOR, x, __iter.objId);
-		 particleCoords.getValue(MDL_YCOOR, y, __iter.objId);
-		 cout<<x<<" "<<y<<endl;
-		 // Shifts in x and y at the particle position
-		 //Point2f u = flow(y, x);
-		 Vec2f flow_at_point = flow.at<Vec2f>(y, x);
-		 shiftedX = round(x + flow_at_point[0]);
-		 shiftedY = round(y + flow_at_point[1]);
-		 //std::cerr<<"The value of x is "<<x<<" and the value of y is "<<y<<std::endl;
-		 //std::cerr<<"The value of x after shift is "<<shiftedX<<" and the value of y is "<<shiftedY<<std::endl;
-		 // Extract particle from the current frame at shiftedX, shiftedY
-		 particleImg.aliasImageInStack(particlesStack, particleIdx);
-		 micExtractParticle(shiftedX, shiftedY, frameImg, particleImg);
-		 particleIdx++;
-		 }
-		////////
-
-		Iaux() = noiseStack;
-		fnCurrentStack = fnParticleStack +  int2Str(i+1) + "noisy.stk";
-		Iaux.write(fnCurrentStack,ALL_IMAGES,true,WRITE_APPEND);
-
-		Iaux2() = particlesStack;
-		fnCurrentStack = fnParticleStack +  int2Str(i+1) + ".stk";
-		Iaux2.write(fnCurrentStack,ALL_IMAGES,true,WRITE_APPEND);
-
-	}
-	std::cerr << "Extracting particles from the frames has been done"
-			<< std::endl;
+        // Compute the shifts between the corrected average and current frame
+        calcOpticalFlowFarneback(avgImg8, frameImg8, flow, 0.5, 6, 150, 1, 5, 1.1, 0);
+        // Read particles of each frame
+        size_t particleIdx = 0;
+        fnCurrentStack = fnParticleStack + int2Str(i+1) + ".stk";
+        fnCTFDescr = fnMovie.removeLastExtension() + "-aligned/xmipp_ctf.ctfparam";
+        ctf.clear();
+        ctf.read(fnCTFDescr);
+        ctf.produceSideInfo();
+        actualPhaseFlip(frameImg,ctf);
+        FOR_ALL_OBJECTS_IN_METADATA(particleCoords)
+        {
+            // The position of the particle in the average image
+            particleCoords.getValue(MDL_XCOOR, x, __iter.objId);
+            particleCoords.getValue(MDL_YCOOR, y, __iter.objId);
+            cout<<x<<" "<<y<<endl;
+            // Shifts in x and y at the particle position
+            //Point2f u = flow(y, x);
+            Vec2f flow_at_point = flow.at<Vec2f>(y, x);
+            shiftedX = round(x + flow_at_point[0]);
+            shiftedY = round(y + flow_at_point[1]);
+            //std::cerr<<"The value of x is "<<x<<" and the value of y is "<<y<<std::endl;
+            //std::cerr<<"The value of x after shift is "<<shiftedX<<" and the value of y is "<<shiftedY<<std::endl;
+            // Extract particle from the current frame at shiftedX, shiftedY
+            particleImg.aliasImageInStack(particlesStack, particleIdx);
+            micExtractParticle(shiftedX, shiftedY, frameImg, particleImg);
+            particleIdx++;
+        }
+        Iaux() = particlesStack;
+        Iaux.write(fnCurrentStack,ALL_IMAGES,true,WRITE_APPEND);
+    }
+    std::cerr<<"Extracting particles from the frames has been done"<<std::endl;
 }
 
 void ProgParticlePolishing::particlePolishing3D() {
