@@ -73,6 +73,11 @@ public:
     /// Remove the shifts from the particles and put them in a stack
     void extractParticels();
 
+    // Extract a noise image from a specific frame (frameImage).
+    void random_noise_areas(const MultidimArray<double> frameImage, MultidimArray<double> &noiseStack);
+
+    //void computing_SNR();
+
     void extractAverageParticle();
 
     /// Extract a particle from an input frame
@@ -91,6 +96,11 @@ public:
 
     /// Define Parameters
     void defineParams();
+
+    /// Compute de signal noise ratio
+    void computing_SNR();
+
+    void write_SNR(FileName fnfile, MultidimArray<double> SNR);
 
     /** Run */
     void run();
