@@ -36,8 +36,7 @@ public:
     FileName fnMovie, fnParticleStack;
     /// Shifts from Optical Flow
     FileName fnAvg;
-    // File name for the initial estimated optical flows
-    FileName fnInitFlow;
+
     /// Particle coordinates from corrected average (Optical Flow)
     FileName fnparticleCoords;
 
@@ -54,6 +53,7 @@ public:
     size_t particleRadius, particleSize;
     size_t frameNum, particleNum, iterationNum;
     double shiftLimit, scaleLimit, shearLimit;
+    bool phase_flipped;
     std::vector< Matrix1D<double> > transformationVec;
 
 public:
