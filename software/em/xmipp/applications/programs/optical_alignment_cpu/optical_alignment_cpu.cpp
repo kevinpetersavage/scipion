@@ -268,7 +268,7 @@ public:
 
         // Object for optical flow
         FarnebackOpticalFlow d_calc;
-        gpu::setDevice(gpuDevice);
+        setDevice(gpuDevice);
 
         // Initialize the parameters for optical flow structure
         d_calc.numLevels=6;
@@ -301,9 +301,9 @@ public:
             II() = avgCurr;
             II.write(foname);
             if (doAverage)
-            	rawPSDFile = foname.removeLastExtension()+"_corrected";
+                rawPSDFile = foname.removeLastExtension()+"_corrected";
             else
-            	rawPSDFile = foname.removeLastExtension()+"_raw";
+                rawPSDFile = foname.removeLastExtension()+"_raw";
             std::cerr<<"The file name is"<<rawPSDFile<<std::endl;
             String args=formatString("--micrograph %s --oroot %s --dont_estimate_ctf --pieceDim %d --overlap 0.7",
                                      foname.c_str(), rawPSDFile.c_str(), psdPieceSize);
@@ -312,9 +312,9 @@ public:
             if (system(cmd.c_str())==-1)
                 REPORT_ERROR(ERR_UNCLASSIFIED,"Cannot open shell");
             if (doAverage)
-            	return 0;
+                return 0;
             else
-            	foname.deleteFile();
+                foname.deleteFile();
         }
         cout<<"Frames "<<fstFrame<<" to "<<lstFrame<<" under processing ..."<<std::endl;
 
@@ -411,7 +411,7 @@ public:
                     d_mapx.upload(mapx);
                     d_mapy.upload(mapy);
                     d_preimg.upload(preimg);
-                    gpu::remap(d_preimg,d_dest,d_mapx,d_mapy,INTER_CUBIC);
+                    remap(d_preimg,d_dest,d_mapx,d_mapy,cv::INTER_CUBIC);
                     d_dest.download(dest);
 
                     d_dest.release();
@@ -452,8 +452,8 @@ public:
             psdCorrArr=psdCorr();
             psdRawArr=psdRaw();
             for (size_t i=0;i<psdPieceSize;i++)
-            	for (size_t j=0;j<size_t(psdPieceSize/2);j++)
-            		DIRECT_A2D_ELEM(psdCorrArr,i,j)=DIRECT_A2D_ELEM(psdRawArr,i,j);
+                for (size_t j=0;j<size_t(psdPieceSize/2);j++)
+                    DIRECT_A2D_ELEM(psdCorrArr,i,j)=DIRECT_A2D_ELEM(psdRawArr,i,j);
             psdCorr()=psdCorrArr;
             psdCorr.write(correctedPSDFile+".psd");
             FileName auxFile = rawPSDFile.addExtension("psd");

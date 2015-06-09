@@ -144,6 +144,7 @@ class ProjectWindow(ProjectBaseWindow):
     def _loadWorkflow(self, obj):
         try:
             self.project.loadProtocols(obj.getPath())
+            self.getViewWidget().updateRunsGraph(True, reorganize=True)
         except Exception, ex:
             self.showError(str(ex))
             
@@ -272,14 +273,19 @@ class ProjectManagerWindow(ProjectBaseWindow):
     def onGeneral(self):
         # Config -> General
         _open_cmd('%s/.config/scipion/scipion.conf' % os.environ['HOME'])
+        _open_cmd('%s/config/scipion.conf' % os.environ['SCIPION_HOME'])
 
     def onHosts(self):
         # Config -> Hosts
-        _open_cmd('%s/.config/scipion/hosts.conf' % os.environ['HOME'])
+        _open_cmd('%s/config//hosts.conf' % os.environ['SCIPION_HOME'])
+        if os.path.exists('%s/.config/scipion/hosts.conf' % os.environ['HOME']):
+            _open_cmd('%s/.config/scipion/hosts.conf' % os.environ['HOME'])
 
     def onProtocols(self):
         # Config -> Protocols
-        _open_cmd('%s/.config/scipion/protocols.conf' % os.environ['HOME'])
+        _open_cmd('%s/config/protocols.conf' % os.environ['SCIPION_HOME'])
+        if os.path.exists('%s/.config/scipion/protocols.conf' % os.environ['HOME']):
+            _open_cmd('%s/.config/scipion/protocols.conf' % os.environ['HOME'])
 
 
 

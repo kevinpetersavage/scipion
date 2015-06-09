@@ -40,7 +40,7 @@ import pyworkflow.protocol as pwprot
 import pyworkflow.gui as pwgui
 import pyworkflow.em as em
 
-from pyworkflow.viewer import DESKTOP_TKINTER
+from pyworkflow.viewer import DESKTOP_TKINTER, ProtocolViewer
 from pyworkflow.utils.properties import Message, Icon, Color
 
 
@@ -293,12 +293,13 @@ class SearchProtocolWindow(pwgui.Window):
         
     def _onSearchClick(self, e=None):
         self._resultsTree.clear()
-        keyword = self._searchVar.get()
+        keyword = self._searchVar.get().lower()
         emProtocolsDict = em.getProtocols()
         for key, prot in emProtocolsDict.iteritems():
-            label = prot.getClassLabel()
-            if keyword in label:
-                self._resultsTree.insert('', 'end', key, text=label, tags=('protocol'))
+            if not issubclass(prot, ProtocolViewer):
+                label = prot.getClassLabel().lower()
+                if keyword in label:
+                    self._resultsTree.insert('', 'end', key, text=label, tags=('protocol'))
         
 
 class RunIOTreeProvider(pwgui.tree.TreeProvider):
@@ -425,6 +426,7 @@ class RunIOTreeProvider(pwgui.tree.TreeProvider):
                         suffix = '[Item %s]' % extendedValue
                     if obj.get() is None:
                         labelObj = obj.getObjValue()
+                        suffix = ''
                     else:
                         labelObj = obj.get()
                 else:
@@ -632,7 +634,7 @@ class ProtocolsView(tk.Frame):
              then only case when False is from _automaticRefreshRuns where the
              refresh time is doubled each time to avoid refreshing too often.
         """
-        if os.environ.get('SCIPION_DEBUG', None) == '1':
+        if pwutils.envVarOn('SCIPION_DEBUG'):
             import psutil
             proc = psutil.Process(os.getpid())
             mem = psutil.virtual_memory()
@@ -782,7 +784,6 @@ class ProtocolsView(tk.Frame):
         
     def _treeViewItemChange(self, openItem):
         item = self.protTree.focus()
-        print "DEBUG: _treeViewItemChange, item: ", item
         if item in self.protTreeItems:
             self.protTreeItems[item].openItem.set(openItem)
         
@@ -1167,7 +1168,6 @@ class ProtocolsView(tk.Frame):
         if len(viewers):
             #TODO: If there are more than one viewer we should display a selection menu
             firstViewer = viewers[0](project=self.project, protocol=prot) # Instanciate the first available viewer
-            from pyworkflow.viewer import ProtocolViewer
             if isinstance(firstViewer, ProtocolViewer):
                 firstViewer.visualize(prot, windows=self.windows)
             else:
