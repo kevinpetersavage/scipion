@@ -37,7 +37,7 @@ class TestMixedBPV(TestWorkflow):
         
         # Perform a downsampling on the micrographs
         print "Downsampling..."
-        protDownsampling = self.newProtocol(XmippProtPreprocessMicrographs, doDownsample=True, downFactor=5, doCrop=False, runMode=1)
+        protDownsampling = self.newProtocol(XmippProtPreprocessMicrographs, doDownsample=True, downFactor=5, doCrop=False, runMode=1, numberOfMpi=32)
         protDownsampling.inputMicrographs.set(protImport.outputMicrographs)
         self.launchProtocol(protDownsampling)
         self.assertIsNotNone(protDownsampling.outputMicrographs, "There was a problem with the downsampling")
@@ -45,7 +45,7 @@ class TestMixedBPV(TestWorkflow):
         
         # Estimate CTF on the downsampled micrographs
         print "Performing CTFfind..."   
-        protCTF = self.newProtocol(ProtCTFFind, numberOfThreads=4, minDefocus=2.2, maxDefocus=2.5)
+        protCTF = self.newProtocol(ProtCTFFind, numberOfThreads=1, minDefocus=2.2, maxDefocus=2.5, numberOfMpi=32)
         protCTF.inputMicrographs.set(protDownsampling.outputMicrographs)        
         self.launchProtocol(protCTF)
         self.assertIsNotNone(protCTF.outputCTF, "There was a problem with the CTF estimation")
@@ -63,7 +63,7 @@ class TestMixedBPV(TestWorkflow):
         protPP = self.newProtocol(ProtImportCoordinates,
                                  importFrom=ProtImportCoordinates.IMPORT_FROM_EMAN,
                                  filesPath=self.crdsDir,
-                                 filesPattern='info/*_info.json', boxSize=110)
+                                 filesPattern='*_info.json', boxSize=110)
         protPP.inputMicrographs.set(protDownsampling.outputMicrographs)
         self.launchProtocol(protPP)
         self.assertIsNotNone(protPP.outputCoordinates, "There was a problem with the Eman import coordinates")
@@ -71,7 +71,7 @@ class TestMixedBPV(TestWorkflow):
 
         # Extract the SetOfParticles.
         print "Run extract particles with other downsampling factor"
-        protExtract = self.newProtocol(XmippProtExtractParticles, boxSize=64, downsampleType=OTHER, doFlip=False, downFactor=8, runMode=1, doInvert=False)
+        protExtract = self.newProtocol(XmippProtExtractParticles, boxSize=64, downsampleType=OTHER, doFlip=False, downFactor=8, runMode=1, doInvert=False, numberOfMpi=32)
         protExtract.inputCoordinates.set(protPP.outputCoordinates)
         protExtract.ctfRelations.set(protCTF.outputCTF)
         protExtract.inputMicrographs.set(protImport.outputMicrographs)
@@ -88,7 +88,7 @@ class TestMixedBPV(TestWorkflow):
                                     symmetry='I1', PhaseResidual=30,
                                     molMass=19400,
                                     score=5, resolution=20,
-                                    runMode=1, numberOfMpi=5)
+                                    runMode=1, numberOfMpi=32)
         protFrealign.inputParticles.set(protExtract.outputParticles)
         protFrealign.input3DReference.set(protImportVol.outputVolume)
         self.launchProtocol(protFrealign)
@@ -124,7 +124,7 @@ class TestMixedBPV2(TestWorkflow):
         
         # Perform a downsampling on the micrographs
         print "Downsampling..."
-        protDownsampling = self.newProtocol(XmippProtPreprocessMicrographs, doDownsample=True, downFactor=5, doCrop=False, runMode=1)
+        protDownsampling = self.newProtocol(XmippProtPreprocessMicrographs, doDownsample=True, downFactor=5, doCrop=False, runMode=1, numberOfMpi=32)
         protDownsampling.inputMicrographs.set(protImport.outputMicrographs)
         self.launchProtocol(protDownsampling)
         self.assertIsNotNone(protDownsampling.outputMicrographs, "There was a problem with the downsampling")
@@ -132,7 +132,7 @@ class TestMixedBPV2(TestWorkflow):
         
         # Estimate CTF on the downsampled micrographs
         print "Performing CTFfind..."   
-        protCTF = self.newProtocol(ProtCTFFind, numberOfThreads=4, minDefocus=2.2, maxDefocus=2.5)
+        protCTF = self.newProtocol(ProtCTFFind, numberOfThreads=1, minDefocus=2.2, maxDefocus=2.5, numberOfMpi=32)
         protCTF.inputMicrographs.set(protImport.outputMicrographs)        
         self.launchProtocol(protCTF)
         self.assertIsNotNone(protCTF.outputCTF, "There was a problem with the CTF estimation")
@@ -142,14 +142,14 @@ class TestMixedBPV2(TestWorkflow):
         protPP = self.newProtocol(ProtImportCoordinates,
                                  importFrom=ProtImportCoordinates.IMPORT_FROM_EMAN,
                                  filesPath=self.crdsDir,
-                                 filesPattern='info/*_info.json', boxSize=110)
+                                 filesPattern='*_info.json', boxSize=110)
         protPP.inputMicrographs.set(protDownsampling.outputMicrographs)
         self.launchProtocol(protPP)
         self.assertIsNotNone(protPP.outputCoordinates, "There was a problem with the Eman import coordinates")
 
 
         print "<Run extract particles with Same as picking>"
-        protExtract = self.newProtocol(XmippProtExtractParticles, boxSize=110, downsampleType=SAME_AS_PICKING, doFlip=True, doInvert=True, runMode=1)
+        protExtract = self.newProtocol(XmippProtExtractParticles, boxSize=110, downsampleType=SAME_AS_PICKING, doFlip=True, doInvert=True, runMode=1, numberOfMpi=32)
         protExtract.inputCoordinates.set(protPP.outputCoordinates)
         protExtract.ctfRelations.set(protCTF.outputCTF)
         self.launchProtocol(protExtract)
@@ -157,7 +157,7 @@ class TestMixedBPV2(TestWorkflow):
         #self.validateFiles('protExtract', protExtract)
         
         print "Run Preprocess particles"
-        protCropResize = self.newProtocol(XmippProtCropResizeParticles, doResize=True, resizeOption=1, resizeDim=110)
+        protCropResize = self.newProtocol(XmippProtCropResizeParticles, doResize=True, resizeOption=1, resizeDim=110, numberOfMpi=32)
         protCropResize.inputParticles.set(protExtract.outputParticles)
         self.launchProtocol(protCropResize)
         
@@ -165,7 +165,7 @@ class TestMixedBPV2(TestWorkflow):
         
         print "Run ML2D"
         protML2D = self.newProtocol(XmippProtML2D, numberOfClasses=8, maxIters=2,
-                                 numberOfMpi=2, numberOfThreads=2)
+                                 numberOfMpi=32, numberOfThreads=1)
         protML2D.inputParticles.set(protCropResize.outputParticles)
         self.launchProtocol(protML2D)        
         self.assertIsNotNone(protML2D.outputClasses, "There was a problem with ML2D")  

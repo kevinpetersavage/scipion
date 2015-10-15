@@ -36,7 +36,7 @@ class TestMixedRelionTutorial(TestWorkflow):
         self.assertIsNotNone(protImportVol.outputVolume, "There was a problem with the import")
         
         print "Preprocessing the micrographs..."
-        protPreprocess = self.newProtocol(XmippProtPreprocessMicrographs, doCrop=True, cropPixels=25)
+        protPreprocess = self.newProtocol(XmippProtPreprocessMicrographs, doCrop=True, cropPixels=25, numberOfMpi=32)
         protPreprocess.inputMicrographs.set(protImport.outputMicrographs)
         protPreprocess.setObjLabel('crop 50px')
         self.launchProtocol(protPreprocess)
@@ -55,14 +55,14 @@ class TestMixedRelionTutorial(TestWorkflow):
         # Now estimate CTF on the micrographs with ctffind 
         print "Performing CTFfind..."   
         protCTF = self.newProtocol(ProtCTFFind, lowRes=0.04, highRes=0.45, minDefocus=1.2, maxDefocus=3,
-                              runMode=1, numberOfMpi=1, numberOfThreads=16)         
+                              runMode=1, numberOfMpi=32, numberOfThreads=1)         
         protCTF.inputMicrographs.set(protPreprocess.outputMicrographs)
         protCTF.setObjLabel('CTF ctffind')
         self.launchProtocol(protCTF)
 
         print "Run extract particles with <Same as picking> option"
         protExtract = self.newProtocol(XmippProtExtractParticles, boxSize=60, downsampleType=SAME_AS_PICKING, doRemoveDust=False,
-                                                doFlip=False, backRadius=28, runMode=1)
+                                                doFlip=False, backRadius=28, runMode=1, numberOfMpi=32)
         protExtract.inputCoordinates.set(protPP.outputCoordinates)
         protExtract.ctfRelations.set(protCTF.outputCTF)
         protExtract.setObjLabel('Extract particles')
@@ -71,7 +71,7 @@ class TestMixedRelionTutorial(TestWorkflow):
         
         print "Run CL2D"
         protCL2D = XmippProtCL2D(numberOfClasses=32, numberOfInitialClasses=4,
-                                 numberOfIterations=2, numberOfMpi=16)
+                                 numberOfIterations=2, numberOfMpi=32)
         protCL2D.inputParticles.set(protExtract.outputParticles)
         protCL2D.setObjLabel('CL2D')
         self.launchProtocol(protCL2D)   
@@ -80,7 +80,7 @@ class TestMixedRelionTutorial(TestWorkflow):
         # Now estimate CTF on the micrographs with xmipp
         print "Performing Xmipp CTF..."   
         protCTF2 = self.newProtocol(XmippProtCTFMicrographs, lowRes=0.04, highRes=0.45, minDefocus=1.2, maxDefocus=3,
-                              runMode=1, numberOfMpi=1, numberOfThreads=16)         
+                              runMode=1, numberOfMpi=32, numberOfThreads=1)         
         protCTF2.inputMicrographs.set(protPreprocess.outputMicrographs)
         protCTF2.setObjLabel('CTF xmipp')
         self.launchProtocol(protCTF2)
@@ -97,7 +97,7 @@ class TestMixedRelionTutorial(TestWorkflow):
         
         print "Run extract particles with <Same as picking> option"
         protExtract2 = self.newProtocol(XmippProtExtractParticles, boxSize=60, downsampleType=SAME_AS_PICKING, doRemoveDust=False, doInvert=True,
-                                                doFlip=False, backRadius=28, runMode=1)
+                                                doFlip=False, backRadius=28, runMode=1, numberOfMpi=32)
         protExtract2.inputCoordinates.set(protPP2.outputCoordinates)
         protExtract2.ctfRelations.set(protCTF2.outputCTF)
         protExtract2.setObjLabel('Extract particles')
@@ -105,7 +105,7 @@ class TestMixedRelionTutorial(TestWorkflow):
         self.assertIsNotNone(protExtract2.outputParticles, "There was a problem with the extract particles")
         
         print "Run Relion Classification2d"
-        prot2D = ProtRelionClassify2D(regularisationParamT=2, numberOfMpi=4, numberOfThreads=4)
+        prot2D = ProtRelionClassify2D(regularisationParamT=2, numberOfMpi=32, numberOfThreads=4)
         prot2D.numberOfClasses.set(50)
         prot2D.numberOfIterations.set(25)
         prot2D.inputParticles.set(protExtract2.outputParticles)
@@ -114,7 +114,7 @@ class TestMixedRelionTutorial(TestWorkflow):
         self.assertIsNotNone(prot2D.outputClasses, "There was a problem with Relion 2D:\n" + (prot2D.getErrorMessage() or "No error set"))
         
         print "Run Relion Refine"
-        proRef = ProtRelionRefine3D(numberOfMpi=4, numberOfThreads=4)
+        proRef = ProtRelionRefine3D(numberOfMpi=32, numberOfThreads=4)
         proRef.inputParticles.set(protExtract2.outputParticles)
         proRef.referenceVolume.set(protImportVol.outputVolume)
         proRef.setObjLabel('relion Refine')
