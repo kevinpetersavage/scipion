@@ -731,7 +731,7 @@ public class ScipionMetaData extends MetaData {
             if(downsampleFactor == null)
                 downsampleFactor = 1.;
                 //read params from sqlite
-
+            
             return new EllipseCTF(id, Q0, Cs, downsampleFactor, Ts, kV, defU, defV, defAngle, D);
         } catch (Exception ex) {
             IJ.error(ex.getMessage());
@@ -1187,5 +1187,11 @@ public class ScipionMetaData extends MetaData {
     {
     	return self.equals("Micrograph") || self.equals("Movie");
     }
+
+	public String getSelf()
+	{
+		// TODO Auto-generated method stub
+		return self;
+	}
    
 }
