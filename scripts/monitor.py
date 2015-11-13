@@ -45,7 +45,8 @@ def main():
 
     args = parser.parse_args()
     # Get arguments. This will be implement later
-    baseFn = os.path.join(os.environ.get('SCIPION_USER_DATA'),'tmp','log.sqlite')
+    #baseFn = os.path.join(os.environ.get('SCIPION_USER_DATA'),'tmp','log.sqlite')
+    baseFn = os.path.join('/tmp','log.sqlite')
     tableName = 'log'
     print "INFO: log data stored at sqlite file %s in table %s"%(baseFn,tableName)
     conn = lite.connect(baseFn, isolation_level=None)

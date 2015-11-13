@@ -38,7 +38,7 @@ from matplotlib import pyplot
 def getData():
     """ Retrieve several lists with values to plot. """
     # Get arguments. This will be implement later
-    baseFn = os.path.join(os.environ.get('SCIPION_USER_DATA'),'tmp','log.sqlite')
+    baseFn = os.path.join('/tmp','log.sqlite')
     tableName = 'log'
     conn = lite.connect(baseFn, isolation_level=None)
     cur = conn.cursor()
