@@ -29,6 +29,7 @@ from pyworkflow.protocol.params import (PointerParam, FloatParam,
 from pyworkflow.em.data import Volume
 from pyworkflow.em.protocol import ProtReconstruct3D
 from pyworkflow.em.packages.xmipp3.convert import writeSetOfParticles
+from pyworkflow.utils.path import cleanPath
 
 class XmippProtReconstructADMM(ProtReconstruct3D):
     """    
@@ -81,15 +82,54 @@ class XmippProtReconstructADMM(ProtReconstruct3D):
     def _insertAllSteps(self):
         self._createFilenameTemplates()
         self._insertFunctionStep('convertInputStep')
-        self._insertReconstructStep()
+        self._insertFunctionStep('reconstructHtbStep')
 #         self._insertFunctionStep('createOutputStep')
         
-    def _insertReconstructStep(self):
-        #imgSet = self.inputParticles.get()
+        
+    #--------------------------- STEPS functions --------------------------------------------
+    def convertInputStep(self):
+        fnParticles = self._getFileName('input_xmd')
+        imgSet = self.inputParticles.get()
+        writeSetOfParticles(imgSet, fnParticles)
 
-        params =  '  -i %s' % self._getFileName('input_xmd')
+        fnAligned = self._getExtraPath("imagesAligned.xmd")
+        fnAlignedStk = self._getExtraPath("imagesAligned.stk")
+        self.runJob("xmipp_metadata_utilities",'-i %s -o %s --operate keep_column "itemId image shiftX shiftY"'%(fnParticles,fnAligned),numberOfMpi=1)
+        self.runJob("xmipp_transform_geometry",'-i %s -o %s --apply_transform --save_metadata_stack %s'%(fnAligned,fnAlignedStk,fnAligned),numberOfMpi=1)
+        
+        import pyworkflow.em.metadata as metadata
+        from xmipp import SymList
+        mdOut = metadata.MetaData()
+        self.iterMd = metadata.iterRows(fnParticles, sortByLabel=metadata.MDL_ITEM_ID)
+        symlist=SymList()
+        symlist.readSymmetryFile(self.symmetryGroup.get())
+        for row in self.iterMd:
+            itemId = row.getValue(metadata.MDL_ITEM_ID)
+            rot = row.getValue(metadata.MDL_ANGLE_ROT)
+            tilt = row.getValue(metadata.MDL_ANGLE_TILT)
+            psi = row.getValue(metadata.MDL_ANGLE_PSI)
+            
+            equivalentAngles = symlist.symmetricAngles(rot,tilt,psi)
+            for angles in equivalentAngles:
+                rowOut = metadata.Row()
+                rowOut.setValue(metadata.MDL_ITEM_ID,itemId)
+                rowOut.setValue(metadata.MDL_ANGLE_ROT,angles[0])
+                rowOut.setValue(metadata.MDL_ANGLE_TILT,angles[1])
+                rowOut.setValue(metadata.MDL_ANGLE_PSI,angles[2])
+                rowOut.addToMd(mdOut)
+        fnAllAngles = self._getExtraPath("all_angles.xmd")
+        mdOut.write(fnAllAngles)
+        self.runJob("xmipp_metadata_utilities",'-i %s --set join %s itemId'%(fnAligned,fnAllAngles),numberOfMpi=1)
+        self.runJob("xmipp_metadata_utilities",'-i %s --set join %s itemId'%(fnAligned,fnParticles),numberOfMpi=1)
+        cleanPath(fnAllAngles)
+        cleanPath(fnParticles)
+
+    def reconstructHtbStep(self):
+        """ Create the input file in STAR format as expected by Xmipp.
+        If the input particles comes from Xmipp, just link the file. 
+        """
+        params =  '  -i %s' % self._getExtraPath("imagesAligned.xmd")
         params += '  -o %s' % self._getExtraPath('Htb.vol')
-        params += ' --sym %s' % self.symmetryGroup.get()
         maxRes = self.maxRes.get()
         if maxRes == -1:
             digRes = 0.5
@@ -100,18 +140,6 @@ class XmippProtReconstructADMM(ProtReconstruct3D):
         params += ' --thr %d' % self.numberOfThreads.get()
         params += ' --sampling %f' % self.inputParticles.get().getSamplingRate()
         params += ' --iter 0'
-        self._insertFunctionStep('reconstructStep', params)
-        
-    #--------------------------- STEPS functions --------------------------------------------
-    def convertInputStep(self):
-        particlesMd = self._getFileName('input_xmd')
-        imgSet = self.inputParticles.get()
-        writeSetOfParticles(imgSet, particlesMd)
-
-    def reconstructStep(self, params):
-        """ Create the input file in STAR format as expected by Xmipp.
-        If the input particles comes from Xmipp, just link the file. 
-        """
         self.runJob('xmipp_reconstruct_fourier', params)
             
     def createOutputStep(self):
