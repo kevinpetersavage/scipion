@@ -150,3 +150,9 @@ class XmippProtReconstructADMM(ProtReconstruct3D):
         
         self._defineOutputs(outputVolume=volume)
         self._defineSourceRelation(self.inputParticles, volume)
+
+    def _validate(self):
+        errors = []
+        if not self.inputParticles.get().isPhaseFlipped():
+            errors.append("This protocol requires the images to be phase flipped. Re-extract the particles with phase flipping")
+        return errors
