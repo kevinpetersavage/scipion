@@ -85,13 +85,21 @@ class TiltPairSet(EMSet):
     
     def _loadClassesDict(self):
         return globals()
+    
+    def write(self, properties=True):
+        if self._tilted is not None:
+            self._tilted.write()
+        if self._untilted is not None:
+            self._untilted.write()
+        EMSet.write(self)
 
     def close(self):
         if self._tilted is not None:
             self._tilted.close()
         if self._untilted is not None:
             self._untilted.close()
-        EMSet.close(self)    
+        EMSet.close(self)
+        
     
     
 class MicrographsTiltPair(TiltPairSet):
