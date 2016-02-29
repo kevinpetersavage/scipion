@@ -51,7 +51,7 @@ AL_CROSSCORRELATION = 4
 AL_CROSSCORRELATIONOPTICAL = 5
 
 class ProtMovieAlignment(ProtProcessMovies):
-    """ Aligns movies, from direct detectors cameras, into micrographs.
+    """ Aligns movies from direct detectors cameras and sums them into micrographs.
     """
     _label = 'movie alignment'
 
@@ -156,7 +156,7 @@ class ProtMovieAlignment(ProtProcessMovies):
                                                                    AL_CROSSCORRELATIONOPTICAL\
                        ),
                        label='Filter at (A)',
-                       help='1x or 2x. Bin stack before processing.')
+                       help='Maximum frequency for a low pass filter')
 
 
         group.addParam('extraParams', StringParam, default='',

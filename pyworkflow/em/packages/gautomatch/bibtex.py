@@ -1,8 +1,9 @@
+# coding: latin-1
 # **************************************************************************
 # *
-# * Authors:     Carlos Oscar Sorzano (coss@cnb.csic.es)
+# * Authors:     Grigory Sharov (sharov@igbmc.fr)
 # *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * L'Institut de genetique et de biologie moleculaire et cellulaire (IGBMC)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -24,21 +25,30 @@
 # *
 # **************************************************************************
 """
-This sub-package contains data and protocol classes
-wrapping Pytom programs http://www.pytom.org
+Bibtex string file for Gautomatch package.
 """
-from bibtex import _bibtex # Load bibtex dict with references
 
-_logo = 'pytomLogo.jpg'
+_bibtexStr = """
 
-import convert
+@Article{Zhang2016b,
+  Title      = {},
+  Author     = {Zhang K.},
+  Journal    = {unpublished},
+  Year       = {},
+  Pages      = {},
+  Volume     = {},
+  Number     = {},
+  Abstract   = {},
+  Doi        = {},
+  Language   = {},
+  Note	     = {unpublished},
+  PubMedID   = {},
+  ISSN       = {},
+  Url        = {http://www.mrc-lmb.cam.ac.uk/kzhang/Gautomatch}
+}
 
+"""
 
-_environ = convert.getEnviron()
+from pyworkflow.utils import parseBibTex
 
-from protocol_import import ProtPyTomImport
-from protocol_autofocus_classify import ProtAutofocusClassify
-from protocol_frm_alignment import ProtFrmAlign
-
-from viewer import PyTomAutofocusViewer, PyTomFrmAlignmentViewer
-
+_bibtex = parseBibTex(_bibtexStr)  

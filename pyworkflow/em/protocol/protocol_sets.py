@@ -48,7 +48,7 @@ class ProtUnionSet(ProtSets):
     selected sets. It will validate that all sets are of the
     same type of elements (Micrographs, Particles or Volumes) 
     """
-    _label = 'union sets'
+    _label = 'join sets'
     _unionTypes = ['Particles', 
                    'Micrographs', 
                    'CTFs', 
@@ -310,7 +310,7 @@ class ProtSubSet(ProtSets):
                  'elements that are both in input and other set\n'
                  'will be included. If _difference_, elements that\n'
                  'are in input but not in other will picked.')
-        add('setOperation', pwprot.params.EnumParam, 
+        add('setOperation', pwprot.params.EnumParam, condition='not chooseAtRandom',
             default=self.SET_INTERSECTION,
             choices=['intersection', 'difference'],
             display=pwprot.params.EnumParam.DISPLAY_HLIST,
