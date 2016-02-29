@@ -589,6 +589,14 @@ double alignImages(const MultidimArray< double >& Iref,
                    CorrelationAux &aux2,
                    RotationalCorrelationAux &aux3);
 
+/** Correlation between two images Iref and I, by making use of the FOurier transform,
+ *  IrefTransforms. This function speeds up the correlation calculus
+ *
+ */
+double alignImages(const MultidimArray<double>& Iref, const AlignmentTransforms& IrefTransforms, MultidimArray<double>& I,
+                   Matrix2D<double>&M, bool wrap, AlignmentAux &aux, CorrelationAux &aux2,
+                   RotationalCorrelationAux &aux3);
+
 /** Auxiliary class for fast volume alignment */
 class VolumeAlignmentAux
 {

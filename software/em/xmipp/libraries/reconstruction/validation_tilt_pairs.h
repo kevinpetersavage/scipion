@@ -44,46 +44,28 @@
 class ProgValidationTiltPairs: public XmippProgram
 {
 public:
-    /**  Filename tiltpar average */
-    FileName fntiltimage_In;
-    /**  Filename tiltpar average */
-    FileName fnuntiltimage_In;
-    /**  Filename output document file */
-    FileName fnOut;
+    /**  Filename untilt and tilt particles, reference volume */
+    FileName fntilt, fnuntilt, fnOut, fnVol, fnuntilt2assign, fntilt2assign;
+
+    /** Double for sampling projections, each projection will be performed each smprt degrees*/
+    double smprt;
+
+    /*** Maximum shift for aligning */
+    int maxshift;
 
 public:
     /// Define parameters in the command line
     void defineParams();
 
-    /// Transform a set of angles/orientations to a matrix expressed in Pauli basis
-    void quaternion2Paulibasis(double rot, double tilt, double psi, std::complex<double>(&L)[4]);
-
-    /// It calculates the product of two matrix expressed in Pauli matrices by their matrix elements A an B
-    void Pauliproduct(std::complex<double> A[4], std::complex<double> B[4], std::complex<double> (&P)[4]);
-
-    /// Inverse of a matrix (expressed in Pauli basis)
-    void inverse_matrixSU2(std::complex<double> Original[4], std::complex<double> (&Inver)[4]);
-
-    ///A Pauli span is converted to a 2x2 matrix
-    void Paulibasis2matrix(std::complex<double> P[4], std::complex<double> (&M)[4]);
-
-    //From a Pauli vecto, its inverse is calculated
-    void InversefromPaulibasis(std::complex<double> Original[4],	std::complex<double> (&Inver)[4]);
-
-    /// It takes a 2x2 matrix (where M[0] = m11; M[1]=m12; M[2]=m21; M[3]=m22) and express the matrix M,
-    //in the Pauli Basis M=P[0] Sigma0 + P[1] Sigma1 + P[2] Sigma2 + P[3] Sigma3
-    void matrix2Paulibasis(std::complex<double> M[4], std::complex<double> (&P)[4]);
-
-    ///Extract angles alpha_x and alpha_y from the transformation matrix
-    void extrarotationangles(std::complex<double> R[4], double &alpha_x, double &alpha_y);
-
-    ///It takes two sets of angles (rotu, tiltu, psiu) which define Eu, and (rott, tiltt, psit) which define Et,
-    // and returns the tranformation angles, alpha_x an alpha_y for the transformation Et=R(alpha_y)R(alpha_x)Eu.
-    //Where Et an Eu, are the tilted and untilted images.
-    void angles2tranformation(double untilt_angles[3], double tilt_angles[3], double alpha_x, double alpha_y);
-
     /// Read parameters from the command line
     void readParams();
+
+    /// Generating a galllery of projections
+    void generateProjections(FileName fnVol, double smprt);
+
+    void generateFourierStackTP(const MultidimArray<double> &input_stack, std::vector< AlignmentTransforms> &galleryTransforms_Test);
+
+    void assignAngles(const MetaData mduntilt_exp, FileName fnun_out);
 
     /// Execute de program
     void run();

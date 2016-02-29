@@ -26,7 +26,8 @@
 #include <data/metadata.h>
 #include <data/metadata_extension.h>
 #include <complex>
-//#include <cmath>
+//#define DEBUG
+//#define DEBUG1
 
 /*
  * xmipp_validation_tilt_pairs --tilt /home/vilas/ScipionUserData/projects/rct/Runs/001623_XmippProtValidateTilt/extra/tilted/angles_iter001_00.xmd --untilt /home/vilas/ScipionUserData/projects/rct/Runs/001623_XmippProtValidateTilt/extra/untilted/angles_iter001_00.xmd -o caca
@@ -38,355 +39,341 @@ void ProgValidationTiltPairs::defineParams()
     //Usage
     addUsageLine("Takes two coordinates sets and defines the coordinate transformation between them");
 	addUsageLine("First set defines the untilted coordinates, second set defines the tilted coordinates");
-	addParamsLine(" --tilt <metadata> : Metadata with angular assignment for the tilted images");
-	addParamsLine(" --untilt <metadata> : Metadata with angular assignment for the untilted images");
-	addParamsLine(" -o <metadata> : Metadata with matrix transformation");
+	addParamsLine(" --tilt <md_file=\"\"> : Metadata with angular assignment for the tilted images");
+	addParamsLine(" --untilt2assign <md_file=\"\"> : Metadata with untilted particles to be angular assigned");
+	addParamsLine(" --tilt2assign <md_file=\"\"> : Metadata with tilted particles to be angular assigned");
+	addParamsLine(" --untilt <md_file=\"\"> : Metadata with angular assignment for the untilted images");
+	addParamsLine(" -o <md_file=\"\"> : Metadata with matrix transformation");
+	addParamsLine("  [--vol <img_file=\"\">]    : Input reference volume");
+	addParamsLine("  [--angular_sampling <s=5>]   : Angular sampling rate in degrees. This sampling "
+			"represents the accuracy for assigning directions");
+	addParamsLine("  [--maxshift <s=10>]   : Maximum shift for aligning images (in pixels)");
 }
-
 
 
 //Read params
 void ProgValidationTiltPairs::readParams()
 {
-    fntiltimage_In = getParam("--tilt");  //Set of tilted coordinates
-    fnuntiltimage_In = getParam("--untilt");
+    fntilt = getParam("--tilt");  //Set of tilted coordinates
+    fnuntilt = getParam("--untilt");
+    fnuntilt2assign = getParam("--untilt2assign");
+    fntilt2assign = getParam("--tilt2assign");
 	fnOut = getParam("-o");  //Output file
+	fnVol = getParam("--vol");
+	smprt = getDoubleParam("--angular_sampling");
+	maxshift = getIntParam("--maxshift");
 }
 
-
-void ProgValidationTiltPairs::quaternion2Paulibasis(double rot, double tilt, double psi, std::complex<double> (&L)[4])
+void ProgValidationTiltPairs::generateFourierStackTP(const MultidimArray<double> &input_stack,
+															std::vector< AlignmentTransforms> &galleryTransforms_Test)
 {
-	double cr, ct, cp, sr, st, sp;
+	FourierTransformer transformer;
+	AlignmentAux aux2;
+	MultidimArray<double> mGalleryProjection;
 
-	cr = cos(rot/2);
-	ct = cos(tilt/2);
-	cp = cos(psi/2);
-	sr = sin(rot/2);
-	st = sin(tilt/2);
-	sp = sin(psi/2);
+	// Calculate transforms of this stack
+	size_t kmax = NSIZE(input_stack);
 
-	L[0] = cr*ct*cp - sr*ct*sp;
-	L[1] = 1i*(sr*st*cp - cr*st*sp);
-	L[2] = 1i*(cr*st*cp + sr*st*sp);
-	L[3] = 1i*(sr*ct*cp+cr*ct*sp);
-}
+	galleryTransforms_Test.resize(kmax);
 
-
-void ProgValidationTiltPairs::matrix2Paulibasis(std::complex<double> M[4],
-		std::complex<double> (&P)[4])
-{
-	//M[0] = m11; M[1]=m12; M[2]=m21; M[3]=m22
-
-	std::complex<double> I=1i;
-	std::complex<double> aux=0.5;
-	P[0]=(M[0]+M[3])*aux;
-	P[1]=(M[1]+M[2])*aux;
-	P[2]=I*(M[1]-M[2])*aux;
-	P[3]=(M[0]-M[3])*aux;
-}
-
-void ProgValidationTiltPairs::InversefromPaulibasis(std::complex<double> Original[4],
-		std::complex<double> (&Inver)[4])
-{
-	//It takes a Pauli expression and returns its inverse expressed in Pauli basis
-
-	//TODO Raise an exception is the Original matrix does not belong to SU(2) group
-
-	std::complex<double> Inver_matrix[4], mat[4];
-	std::complex<double> NOriginal;
-	double aux=0.5;
-
-	Paulibasis2matrix(Original,mat);
-
-	Inver_matrix[0] = mat[3];
-	Inver_matrix[1] = -mat[1];
-	Inver_matrix[2] = -mat[2];
-	Inver_matrix[3] = mat[0];
-
-	matrix2Paulibasis(Inver_matrix,Inver);
-}
-
-void ProgValidationTiltPairs::inverse_matrixSU2(std::complex<double> Original[4],
-		std::complex<double> (&Inver)[4])
-{
-	//It takes a matrix and returns its inverse expressed in Pauli basis
-
-	//TODO Raise an exception is the Original matrix does not belong to SU(2) group
-
-	std::complex<double> Inver_matrix[4];
-
-	Inver_matrix[0] = Original[3];
-	Inver_matrix[1] = -Original[1];
-	Inver_matrix[2] = -Original[2];
-	Inver_matrix[3] = Original[0];
-
-	matrix2Paulibasis(Inver_matrix,Inver);
-}
-
-void ProgValidationTiltPairs::Paulibasis2matrix(std::complex<double> P[4], std::complex<double> (&M)[4])
-{
-	std::complex<double> I=1i;
-	M[0] = (P[0]+P[3]);
-	M[1] = (P[1]-I*P[2]);
-	M[2] = (P[1]+I*P[2]);
-	M[3] = (P[0]-P[3]);
-}
-
-void ProgValidationTiltPairs::Pauliproduct(std::complex<double> A[4], std::complex<double> B[4],
-		std::complex<double> (&P)[4])
-{
-	std::complex<double> A_matrix[4], B_matrix[4], aux[4];
-
-	Paulibasis2matrix(A,A_matrix);
-	Paulibasis2matrix(B,B_matrix);
-
-	aux[0] = A_matrix[0]*B_matrix[0] + A_matrix[1]*B_matrix[2];
-	aux[2] = A_matrix[2]*B_matrix[0] + A_matrix[3]*B_matrix[2];
-	aux[1] = A_matrix[0]*B_matrix[1] + A_matrix[1]*B_matrix[3];
-	aux[3] = A_matrix[2]*B_matrix[1] + A_matrix[3]*B_matrix[3];
-
-	matrix2Paulibasis(aux, P);
-}
-
-void ProgValidationTiltPairs::extrarotationangles(std::complex<double> R[4], double &alpha_x, double &alpha_y)
-{
-	std::complex<double> I=1i;
-	std::complex<double> aux1 = I*R[1]/R[0],  aux2 = I*R[2]/R[0], alpha_aux_x, alpha_aux_y;
-
-	if ((aux1.imag() == 0) && (aux2.imag() == 0))
+	for (size_t k=0; k<kmax; ++k)
 	{
-		alpha_aux_x = 2*atan(aux1.real());
-		alpha_aux_y = 2*atan(aux2.real());
-		alpha_x = alpha_aux_x.real()*180/PI;
-		alpha_y = alpha_aux_y.real()*180/PI;
-	}
-	else
-	{
-		std::cout << "Error, argument of atan is complex" << std::endl;
+
+		mGalleryProjection.aliasImageInStack(input_stack,k);
+		mGalleryProjection.setXmippOrigin();
+
+		AlignmentTransforms imageTransforms_Test;
+		transformer.FourierTransform(mGalleryProjection, imageTransforms_Test.FFTI, true);
+		size_t Ydim, Xdim, Zdim, Ndim;
+		imageTransforms_Test.FFTI.getDimensions(Xdim, Ydim, Zdim, Ndim);
+		normalizedPolarFourierTransform(mGalleryProjection, imageTransforms_Test.polarFourierI, false,
+										XSIZE(mGalleryProjection) / 5, XSIZE(mGalleryProjection) / 2, aux2.plans, 1);
+
+		galleryTransforms_Test[k] = imageTransforms_Test;
+
 	}
 }
 
 
-void ProgValidationTiltPairs::angles2tranformation(double untilt_angles[3],
-		double tilt_angles[3], double alpha_x, double alpha_y)
+void ProgValidationTiltPairs::assignAngles(const MetaData mduntilt_exp, FileName fnun_out)
 {
-	double rotu = untilt_angles[0], tiltu = untilt_angles[1], psiu = untilt_angles[2];
-	double rott = tilt_angles[0], tiltt = tilt_angles[1], psit = tilt_angles[2];
-	std::complex<double> qu[4], M[4], Inv_qu[4], qt[4], R[4];
 
-	quaternion2Paulibasis(rotu, tiltu, psiu, qu);
-    Paulibasis2matrix(qu,M);
-    inverse_matrixSU2(M, Inv_qu);
-    quaternion2Paulibasis(rott, tiltt, psit, qt);
-    Pauliproduct(qt, Inv_qu, R);
+	size_t len_p, idxp, Xdim, Ydim, Zdim, Ndim, len_u;
+	Matrix2D<double> angles_rot_tilt, transformation_matrix, position_u_gallery_and_psi;
+	MetaData mdproj;
+	Image<double> imgstack, Img_vol, ImgUn_exp;
+	MultidimArray<double> ImgUn_exp_copy, imgGallery, imgGallery_orig, ImgUn_exp_copy2;
+	double rot, tilt, psi;
+	FileName Untilted_filename_aux, fnuntilt_exp;
+	std::vector<std::string> Untilted_filenames;
+	std::vector< AlignmentTransforms> galleryTransform_;
+	AlignmentAux aux_u;
+	RotationalCorrelationAux aux3;
+	CorrelationAux aux2;
 
-    extrarotationangles(R, alpha_x, alpha_y);
-    std::cout << "alpha_x = " << alpha_x << std::endl;
-    std::cout << "alpha_y = " << alpha_y << std::endl;
+	std::cout << "Generating projections" << std::endl;
+	String args=formatString("-i %s -o gallery.stk --sampling_rate %f", fnVol.c_str(), smprt);
+			//We are considering the psi sampling = angular sampling rate
+
+	String cmd=(String)"xmipp_angular_project_library " + args;
+	system(cmd.c_str());
+
+	FileName fnprojection = formatString("%s/gallery.doc",fnOut.c_str());
+	mdproj.read(fnprojection);
+	len_p = mdproj.size();
+
+
+	imgstack.read(fnOut+"/gallery.stk");
+
+	const MultidimArray<double> allGalleryProjection = imgstack();
+		//State: Finished
+
+	angles_rot_tilt.initZeros(len_p,2); //first column is the rot angle and second column is the tilt angle
+
+	idxp = 0;
+	FOR_ALL_OBJECTS_IN_METADATA(mdproj)
+	{
+		mdproj.getValue(MDL_ANGLE_ROT, rot, __iter.objId);
+		mdproj.getValue(MDL_ANGLE_TILT, tilt, __iter.objId);
+
+		MAT_ELEM(angles_rot_tilt, idxp, 0) = rot;
+		MAT_ELEM(angles_rot_tilt, idxp, 1) = tilt;
+		++idxp;
+	}
+
+	//For each experimental untilted image, an angular assignment is performed
+	std::cout << "Searching correlations" << std::endl;
+
+	Img_vol.read(fnVol);
+	Img_vol().setXmippOrigin();
+
+	mduntilt_exp.getValue(MDL_IMAGE, Untilted_filename_aux, 1);
+	ImgUn_exp.read(Untilted_filename_aux);
+	ImgUn_exp.getDimensions(Xdim, Ydim, Zdim, Ndim);
+
+	//Xdim = NSIZE(Img_vol);
+	int Xdim_int = (int) Xdim;
+	int Ydim_int = (int) Ydim;
+
+	generateFourierStackTP(allGalleryProjection, galleryTransform_); //Untilted
+
+	size_t idx =0;
+
+	len_u = mduntilt_exp.size();
+
+	position_u_gallery_and_psi.initZeros(7,len_u);
+
+	FOR_ALL_OBJECTS_IN_METADATA(mduntilt_exp)
+	{
+		mduntilt_exp.getValue(MDL_IMAGE, fnuntilt_exp, __iter.objId);
+		Untilted_filenames.push_back(fnuntilt_exp);
+
+		ImgUn_exp.read(fnuntilt_exp);	//Reading image
+		ImgUn_exp().setXmippOrigin();
+
+		ImgUn_exp_copy = ImgUn_exp();
+
+		std::cout << "-----------------" <<std::endl;
+		std::cout << fnuntilt_exp << "  " << std::endl;
+		std::cout << "-----------------" <<std::endl;
+
+		double corr=0, bestcorr = 0;
+
+		for (size_t j = 1; j< len_p; j++)
+		{
+			//std::cout << "j = " << j << std::endl;
+			imgGallery.aliasImageInStack(allGalleryProjection,j);
+			imgGallery_orig = imgGallery;
+			imgGallery_orig.setXmippOrigin();
+			ImgUn_exp_copy2 = ImgUn_exp();
+
+//			CORRELATION UNTILT AND PROJECTIONS
+			corr = alignImages(imgGallery_orig, galleryTransform_[j], ImgUn_exp_copy2, transformation_matrix, true, aux_u, aux2, aux3);
+
+			if ((fabs(MAT_ELEM(transformation_matrix, 0, 2)) > maxshift) || (fabs(MAT_ELEM(transformation_matrix, 1, 2)) > maxshift))
+				continue;
+
+			if ((corr <0.7*bestcorr) || (corr<0))
+				continue;
+
+//			//UNTILT ASSIGNMENT
+			double psi = atan2( MAT_ELEM(transformation_matrix,1,0), MAT_ELEM(transformation_matrix,0,0) )*180/PI;
+
+
+
+			if (corr>bestcorr)
+			{
+//					std::cout << "j = " << j << std::endl;
+			#ifdef DEBUG1
+			std::cout << "rot = " << MAT_ELEM(angles_rot_tilt, j, 0) << std::endl;
+			std::cout << "tilt = " << MAT_ELEM(angles_rot_tilt, j, 1) << std::endl;
+			std::cout << "psi = " << psi << std::endl;
+			std::cout << "corr = " << corr << std::endl;
+			char ch;
+			ch = getchar();
+			#endif
+				#ifdef DEBUG
+				std::cout << "j = " << j << std::endl;
+				std::cout << fnuntilt_exp << "  " << std::endl;
+				//UNTILTED PARTICLE
+				Image<double> save;
+				save()=ImgUn_exp();
+				save.write("PPPExp_img.xmp");  //Experimental image
+
+				save()=ImgUn_exp_copy2;
+				save.write("PPPExp_img_rot.xmp");  //Experimental rotated image
+
+				save()=imgGallery_orig;
+				save.write("PPPGal_img.xmp");  //Gallery image
+
+				std::cout << "rot = " << MAT_ELEM(angles_rot_tilt, j, 0) << std::endl;
+				std::cout << "tilt = " << MAT_ELEM(angles_rot_tilt, j, 1) << std::endl;
+				std::cout << "psi = " << psi << std::endl;
+				std::cout << "corr = " << corr << std::endl;
+
+				char c;
+				getchar();
+				#endif
+				bestcorr = corr;
+				MAT_ELEM(position_u_gallery_and_psi, 0, idx) = j;
+				MAT_ELEM(position_u_gallery_and_psi, 1, idx) = MAT_ELEM(angles_rot_tilt, j, 0);
+				MAT_ELEM(position_u_gallery_and_psi, 2, idx) = MAT_ELEM(angles_rot_tilt, j, 1);
+				MAT_ELEM(position_u_gallery_and_psi, 3, idx) = psi;
+				MAT_ELEM(position_u_gallery_and_psi, 4, idx) = corr;
+				MAT_ELEM(position_u_gallery_and_psi, 5, idx) = -MAT_ELEM(transformation_matrix,0,2);  // X Shift  in untilted image
+				MAT_ELEM(position_u_gallery_and_psi, 6, idx) = -MAT_ELEM(transformation_matrix,1,2);  // Y Shift
+
+			}
+		}
+		++idx;
+	}
+
+	MetaData mduntilt_output;
+	size_t objId_un;
+
+	for (size_t k=0; k<(len_u); k++)
+	{
+		//std::cout << "Iteration = " << k << std::endl;
+
+		objId_un = mduntilt_output.addObject();
+		//std::cout << "ObjeId_un = " << objId_un << std::endl;
+		mduntilt_output.setValue(MDL_IMAGE, Untilted_filenames[k], objId_un);
+		mduntilt_output.setValue(MDL_PARTICLE_ID, k+1, objId_un);
+		mduntilt_output.setValue(MDL_ANGLE_ROT, MAT_ELEM(position_u_gallery_and_psi, 1, k), objId_un);
+		mduntilt_output.setValue(MDL_ANGLE_TILT, MAT_ELEM(position_u_gallery_and_psi, 2, k), objId_un);
+		mduntilt_output.setValue(MDL_ANGLE_PSI, MAT_ELEM(position_u_gallery_and_psi, 3, k), objId_un);
+		mduntilt_output.setValue(MDL_MAXCC, MAT_ELEM(position_u_gallery_and_psi, 4, k), objId_un);
+		mduntilt_output.setValue(MDL_SHIFT_X, MAT_ELEM(position_u_gallery_and_psi, 5, k), objId_un);
+		mduntilt_output.setValue(MDL_SHIFT_Y, MAT_ELEM(position_u_gallery_and_psi, 6, k), objId_un);
+	}
+
+	mduntilt_output.write(fnOut+"/"+fnun_out);
 }
+
 
 void ProgValidationTiltPairs::run()
 {
-	MetaData MD_tilted, MD_untilted, DF1sorted, DF2sorted, DFweights;
+	std::cout << "Starting..." << std::endl;
 
-	MD_tilted.read(fntiltimage_In);
-	MD_untilted.read(fnuntiltimage_In);
+	MetaData mduntilt_exp, mdtilt_exp;
+	mduntilt_exp.read(fnuntilt2assign);
+	mdtilt_exp.read(fntilt2assign);
 
-	DF1sorted.sort(MD_tilted,MDL_ITEM_ID,true);
-	DF2sorted.sort(MD_untilted,MDL_ITEM_ID,true);
+	std::cout << "Performing Untilted Assigning" << std::endl;
+	assignAngles(mduntilt_exp, "untilted_assigned.xmd");
 
-	MDIterator iter1(DF1sorted), iter2(DF2sorted);
-	std::vector< Matrix1D<double> > ang1, ang2;
-	Matrix1D<double> rotTiltPsi(3), z(3);
-	size_t currentId;
-	bool anotherImageIn2=iter2.hasNext();
-	size_t id1, id2;
-	bool mirror;
-	Matrix2D<double> Eu, Et, R;
-	double alpha, beta;
-	while (anotherImageIn2)
-	{
-		ang1.clear();
-		ang2.clear();
-
-		// Take current id
-		DF2sorted.getValue(MDL_ITEM_ID,currentId,iter2.objId);
-
-		// Grab all the angles in DF2 associated to this id
-		bool anotherIteration=false;
-		do
-		{
-			DF2sorted.getValue(MDL_ITEM_ID,id2,iter2.objId);
-			anotherIteration=false;
-			if (id2==currentId)
-			{
-				DF2sorted.getValue(MDL_ANGLE_ROT,XX(rotTiltPsi),iter2.objId);
-				DF2sorted.getValue(MDL_ANGLE_TILT,YY(rotTiltPsi),iter2.objId);
-				DF2sorted.getValue(MDL_ANGLE_PSI,ZZ(rotTiltPsi),iter2.objId);
-				DF2sorted.getValue(MDL_FLIP,mirror,iter2.objId);
-				std::cout << "From DF2:" << XX(rotTiltPsi) << " " << YY(rotTiltPsi) << " " << ZZ(rotTiltPsi) << " " << mirror << std::endl;
-				//LINEA ANTERIOR ORIGINAL
-				if (mirror)
-				{
-					double rotp, tiltp, psip;
-					Euler_mirrorX(XX(rotTiltPsi),YY(rotTiltPsi),ZZ(rotTiltPsi), rotp, tiltp, psip);
-					XX(rotTiltPsi)=rotp;
-					YY(rotTiltPsi)=tiltp;
-					ZZ(rotTiltPsi)=psip;
-				}
-				ang2.push_back(rotTiltPsi);
-				iter2.moveNext();
-				if (iter2.hasNext())
-					anotherIteration=true;
-			}
-		} while (anotherIteration);
-
-		// Advance Iter 1 to catch Iter 2
-		double N=0, cumulatedDistance=0;
-		size_t newObjId=0;
-		if (iter1.objId>0)
-		{
-			DF1sorted.getValue(MDL_ITEM_ID,id1,iter1.objId);
-			while (id1<currentId && iter1.hasNext())
-			{
-				iter1.moveNext();
-				DF1sorted.getValue(MDL_ITEM_ID,id1,iter1.objId);
-			}
-
-			// If we are at the end of DF1, then we did not find id1 such that id1==currentId
-			if (!iter1.hasNext())
-				break;
-
-			// Grab all the angles in DF1 associated to this id
-			anotherIteration=false;
-			do
-			{
-				DF1sorted.getValue(MDL_ITEM_ID,id1,iter1.objId);
-				anotherIteration=false;
-				if (id1==currentId)
-				{
-					DF1sorted.getValue(MDL_ANGLE_ROT,XX(rotTiltPsi),iter1.objId);
-					DF1sorted.getValue(MDL_ANGLE_TILT,YY(rotTiltPsi),iter1.objId);
-					DF1sorted.getValue(MDL_ANGLE_PSI,ZZ(rotTiltPsi),iter1.objId);
-					DF1sorted.getValue(MDL_FLIP,mirror,iter1.objId);
-					std::cout << "From DF1:" << XX(rotTiltPsi) << " " << YY(rotTiltPsi) << " " << ZZ(rotTiltPsi) << " " << mirror << std::endl;
-					//LINEA ANTERIOR ORIGINAL
-					if (mirror)
-					{
-						double rotp, tiltp, psip;
-						Euler_mirrorX(XX(rotTiltPsi),YY(rotTiltPsi),ZZ(rotTiltPsi), rotp, tiltp, psip);
-						XX(rotTiltPsi)=rotp;
-						YY(rotTiltPsi)=tiltp;
-						ZZ(rotTiltPsi)=psip;
-					}
-					ang1.push_back(rotTiltPsi);
-					iter1.moveNext();
-					if (iter1.hasNext())
-						anotherIteration=true;
-				}
-			} while (anotherIteration);
-
-			// Process both sets of angles
-			for (size_t i=0; i<ang2.size(); ++i)
-			{
-				const Matrix1D<double> &anglesi=ang2[i];
-				double rotu=XX(anglesi);
-				double tiltu=YY(anglesi);
-				double psiu=ZZ(anglesi);
-				Euler_angles2matrix(rotu,tiltu,psiu,Eu,false);
-				/*std::cout << "------UNTILTED MATRIX------" << std::endl;
-				std::cout << Eu << std::endl;
-				std::cout << "vector" << std::endl;
-				std::cout << Eu(2,0) << "  " << Eu(2,1) << "  " << Eu(2,2) << std::endl;*/
+	std::cout << "Performing Tilted Assigning" << std::endl;
+	assignAngles(mdtilt_exp, "tilted_assigned.xmd");
 
 
-				for (size_t j=0; j<ang1.size(); ++j)
-				{
-					const Matrix1D<double> &anglesj=ang1[j];
-					double rott=XX(anglesj);
-					double tiltt=YY(anglesj);
-					double psit=ZZ(anglesj);
-					double alpha_x, alpha_y;
-					Euler_angles2matrix(rott,tiltt,psit,Et,false);
-					//////////////////////////////////////////////////////////////////
-					double untilt_angles[3]={rotu, tiltu, psiu}, tilt_angles[3]={rott, tiltt, psit};
-					angles2tranformation(untilt_angles, tilt_angles, alpha_x, alpha_y);
-					//std::cout << "alpha = " << (alpha_x*alpha_x+alpha_y*alpha_y) << std::endl;
-					//////////////////////////////////////////////////////////////////
-					/*std::cout << "------TILTED MATRIX------" << std::endl;
-					std::cout << Et << std::endl;
-					std::cout << "vector" << std::endl;
-					std::cout << Et(2,0) << "  " << Et(2,1) << "  " << Et(2,2) << std::endl;
-					std::cout << "---------------------------" << std::endl;
-					std::cout << "---------------------------" << std::endl;*/
-					R=Eu*Et.transpose();
-					double rotTransf, tiltTransf, psiTransf;
-					Euler_matrix2angles(R, rotTransf, tiltTransf, psiTransf);
-					std::cout << "Rot_and_Tilt " << rotTransf << " " << tiltTransf << std::endl;
-					//LINEA ANTERIOR ORIGINAL
-
-				XX(z) = Eu(2,0) - Et(2,0);
-				YY(z) = Eu(2,1) - Et(2,1);
-				ZZ(z) = Eu(2,2) - Et(2,2);
-
-				alpha = atan2(YY(z), XX(z));        //Expressed in rad
-				beta = atan2(XX(z)/cos(alpha), ZZ(z));   //Expressed in rad
-				std::cout << "alpha = " << alpha*180/PI << std::endl;
-				std::cout << "beta = " << beta*180/PI << std::endl;
-				}
-			}
-		}
-		else
-			N=0;
-
-		if (N>0)
-		{
-			double meanDistance=cumulatedDistance/ang2.size();
-			DFweights.setValue(MDL_ANGLE_DIFF,meanDistance,newObjId);
-		}
-		else
-			if (newObjId>0)
-				DFweights.setValue(MDL_ANGLE_DIFF,-1.0,newObjId);
-		anotherImageIn2=iter2.hasNext();
-	}
-
-	std::complex<double> qu[4], qt[4], M[4], Inv_qu[4], test[4], P1[4], P2[4], Inv_quu[4];
-	double rotu=34*PI/180, tiltu=10*PI/180, psiu=5*PI/180;
-	double rott=25*PI/180, tiltt=15*PI/180, psit=40*PI/180;
 
 
-    quaternion2Paulibasis(rotu, tiltu, psiu, qu);
-    /*std::cout << "quaternion2Pauli" << std::endl;
-    std::cout << "Untilted " << qu[0] << " " << qu[1] << " " << qu[2] << " " << qu[3] << std::endl;
-    std::cout << "      " << std::endl;*/
 
-    Paulibasis2matrix(qu,M);
-    /*std::cout << "Pauli2matrix" << std::endl;
-    std::cout << "Matriz   " << M[0] << " " << M[1] << " " << M[2] << " " << M[3] << std::endl;
-    std::cout << "      " << std::endl;*/
 
-    inverse_matrixSU2(M, Inv_qu);
-    /*std::cout << "inverse_matrixSU(2)" << std::endl;
-    std::cout << "Inversa  " << Inv_qu[0] << " " << Inv_qu[1] << " " << Inv_qu[2] << " " << Inv_qu[3] << std::endl;
-    std::cout << "      " << std::endl;*/
 
-    quaternion2Paulibasis(rott, tiltt, psit, qt);
-    /*std::cout << "quaternion2Pauli" << std::endl;
-    std::cout << "Tilted " << qt[0] << " " << qt[1] << " " << qt[2] << " " << qt[3] << std::endl;
-    std::cout << "      " << std::endl;*/
+//	std::cout << "Starting..." << std::endl;
+//
+//	//Reading metadata with untilted and tilted angles
+//	size_t len_u, len_t;
+//	MetaData md_u, md_t, md_mic;
+//
+//	md_u.read(fnuntilt);
+//	md_t.read(fntilt);
+//
+//	len_u = md_u.size();
+//	len_t = md_t.size();
+//
+//	if (len_u!=len_t)
+//	{
+//		std::cerr << "ERROR: Mismatch dimensions: Number of untilted and tilted particles is not the same" << std::endl;
+//		exit(0);
+//	}
+//
+//	MetaData md_u_sorted, md_t_sorted, md_out;
+//	md_u_sorted.sort(md_u, MDL_ITEM_ID, true);
+//	md_t_sorted.sort(md_t, MDL_ITEM_ID, true);
+//
+//	size_t elementId_u, elementId_t, objId_out;
+//	double rot_u, rot_t, tilt_u, tilt_t, psi_u, psi_t;
+//	Matrix2D<double> ZYZ_u, ZYZ_t, ZYZ_angles;
+//	Matrix1D<double> Eu_dir;
+//
+//	ZYZ_u.initZeros(4,4);
+//	ZYZ_t.initZeros(4,4);
+//	ZYZ_angles.initZeros(4,4);
+//
+//	double alpha, beta, gamma;
+//
+//	FOR_ALL_OBJECTS_IN_METADATA2(md_u_sorted, md_t_sorted)
+//	{
+//
+//		md_u_sorted.getValue(MDL_ITEM_ID, elementId_u ,__iter.objId);
+//		md_u_sorted.getValue(MDL_ANGLE_ROT, rot_u ,__iter.objId);
+//		md_u_sorted.getValue(MDL_ANGLE_TILT, tilt_u,__iter.objId);
+//		md_u_sorted.getValue(MDL_ANGLE_PSI, psi_u,__iter.objId);
+//
+//		md_t_sorted.getValue(MDL_ITEM_ID, elementId_t,__iter2.objId);
+//		md_t_sorted.getValue(MDL_ANGLE_ROT, rot_t,__iter2.objId);
+//		md_t_sorted.getValue(MDL_ANGLE_TILT, tilt_t,__iter2.objId);
+//		md_t_sorted.getValue(MDL_ANGLE_PSI, psi_t,__iter2.objId);
+//
+//		Euler_angles2matrix(rot_u, tilt_u, psi_u, ZYZ_u);
+//		Euler_angles2matrix(rot_t, tilt_t, psi_t, ZYZ_t);
+//
+//		ZYZ_angles = ZYZ_t* (ZYZ_u.inv());
+//
+//		std::cout << elementId_u << "  " << elementId_t << std::endl;
+//		std::cout << "rot_u  " << rot_u << std::endl;
+//		std::cout << "tilt_u " << tilt_u << std::endl;
+//		std::cout << "psi_u  " << psi_u << std::endl;
+//		std::cout << "--------------------" << std::endl;
+//		std::cout << "rot_t  " << rot_t << std::endl;
+//		std::cout << "tilt_t " << tilt_t << std::endl;
+//		std::cout << "psi_t  " << psi_t << std::endl;
+//		std::cout << "--------------------" << std::endl;
+//		std::cout << "ZYZ_u = " << ZYZ_u << std::endl;
+//		std::cout << "ZYZ_t = " << ZYZ_t << std::endl;
+//		std::cout << "ZYZ_matrix = " << ZYZ_angles << std::endl;
+//
+//
+//		Euler_matrix2angles(ZYZ_angles, alpha, beta, gamma);
+//		alpha *= -1;
+//		std::cout << "alpha = " << alpha << std::endl;
+//		std::cout << "betaa = " << beta << std::endl;
+//		std::cout << "gamma = " << gamma << std::endl;
+//		std::cout << "        " << std::endl;
+//		std::cout << "        " << std::endl;
+//
+//		objId_out = md_out.addObject();
+//		md_out.setValue(MDL_ITEM_ID, elementId_u,objId_out);
+//		md_out.setValue(MDL_ANGLE_ROT, alpha, objId_out);
+//		md_out.setValue(MDL_ANGLE_TILT, beta, objId_out);
+//		md_out.setValue(MDL_ANGLE_PSI, gamma, objId_out);
+//
+//	}
+//
+//	md_out.write((String)"particles@"+fnOut+"_angular_assignment"+".xmd");
 
-    InversefromPaulibasis(qu,Inv_quu);
-
-    Pauliproduct(qt, Inv_qu, P1);
-    /*std::cout << "Pauliproduct" << std::endl;
-    std::cout << "quaternion qt  " << P1[0] << " " << P1[1] << " " << P1[2] << " " << P1[3] << std::endl;
-    std::cout << "      " << std::endl;
-    std::cout << "-----------------------------------" << std::endl;*/
-
-    //double alpha_x, alpha_y;
-    //extrarotationangles(P1, alpha_x, alpha_y);
-    //std::cout << "alpha_x = " << alpha_x << " " << "alpha_y = " << alpha_y << std::endl;
 }
-
 
 
