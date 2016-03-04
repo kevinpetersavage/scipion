@@ -33,12 +33,12 @@ from pyworkflow.gui.dialog import askYesNo
 from pyworkflow.em.protocol import ProtParticlePicking
 
 import eman2
-from pyworkflow.em.packages.eman2.data import loadJson
+from pyworkflow.em.packages.eman2.convert import loadJson
 from convert import readSetOfCoordinates
 
 
 class EmanProtBoxing(ProtParticlePicking):
-    """Protocol to pick particles in a set of micrographs using eman"""
+    """ Picks particles in a set of micrographs using eman2 boxer. """
     _label = 'boxer'
         
     def __init__(self, **args):     
@@ -109,11 +109,7 @@ class EmanProtBoxing(ProtParticlePicking):
     #--------------------------- INFO functions ---------------------------------------------------
     def _validate(self):
         errors = []
-        if not eman2.getVersion():
-            errors.append("We couldn't detect EMAN version. ")
-            errors.append("Please, check your configuration file and change EMAN2DIR.")
-            errors.append("The path should contains either '2.11' or '2.12' ")
-            errors.append("to properly detect the version.")
+        eman2.validateVersion(self, errors)
         return errors
 
     def _warnings(self):

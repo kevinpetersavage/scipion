@@ -24,7 +24,7 @@
 # *
 # **************************************************************************
 """
-This sub-package will contains Xmipp specific protocols
+This sub-package contains Xmipp specific protocols
 """
 
 from bibtex import _bibtex # Load bibtex dict with references
@@ -52,10 +52,9 @@ from viewer_movie_alignment import XmippMovieAlignViewer
 from viewer_normalize_strain import XmippNormalizeStrainViewer
 from viewer_resolution3d import XmippResolution3DViewer
 from viewer_validate_nontilt import XmippValidateNonTiltViewer
-from viewer_validate_overfitting import XmippValidateOverfittingViewer
 from viewer_split_volume import XmippViewerSplitVolume
+from viewer_validate_overfitting import XmippValidateOverfittingViewer
 from viewer_volume_strain import XmippVolumeStrainViewer
-from viewer_reconstruct_highres import XmippReconstructHighResViewer
 
 #from viewer_reconstruct_significant import XmippReconstructSignificantViewer
 # TODO(coss): add viewer_reconstruct_significant.py pretty please
@@ -82,6 +81,7 @@ from protocol_helical_parameters import XmippProtHelicalParameters
 from protocol_kerdensom import XmippProtKerdensom
 from protocol_ml2d import XmippProtML2D
 from protocol_movie_alignment import ProtMovieAlignment
+from protocol_multiple_fscs import XmippProtMultipleFSCs
 from protocol_multireference_alignability import XmippProtMultiRefAlignability
 from protocol_normalize_strain import XmippProtNormalizeStrain
 from protocol_particle_pick_automatic import XmippParticlePickingAutomatic
@@ -104,7 +104,8 @@ from protocol_validate_nontilt import XmippProtValidateNonTilt
 from protocol_validate_overfitting import XmippProtValidateOverfitting
 from protocol_validate_tilt import XmippProtValidateTilt
 from protocol_volume_strain import XmippProtVolumeStrain
-
+from protocol_write_testC import XmippProtWriteTestC
+from protocol_write_testP import XmippProtWriteTestP
 # Wizards
 from wizard import *
 

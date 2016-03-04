@@ -261,19 +261,23 @@ public class GalleryData {
         
         useGeo = wrap = false;
         displayLabels = null;
-        mode = Mode.GALLERY_MD;
+
+        if (mode == null)
+            mode = Mode.GALLERY_MD;
         this.renderImages = true;
         displaycis = new HashMap<String, ColumnInfo>();
         this.inverty = parameters.inverty;
+
         if(parameters.getBlock() == null)
             parameters.setBlock(selectedBlock);//Identifies parameters with first block loaded
-        if (parameters.mode.equalsIgnoreCase(Params.OPENING_MODE_METADATA)) 
-            {
-                mode = Mode.TABLE_MD;
-            }
+
+        if (parameters.mode.equalsIgnoreCase(Params.OPENING_MODE_METADATA))
+            mode = Mode.TABLE_MD;
+        else if (parameters.mode.equalsIgnoreCase(Params.OPENING_MODE_GALLERY))
+            mode = Mode.GALLERY_MD;
+
         if(parameters.getBlock().equals(selectedBlock))
         {
-        
             setRenderLabels(parameters.renderLabels);
             setRenderLabel(parameters.getRenderLabel());
             setVisibleLabels(parameters.visibleLabels);
@@ -659,7 +663,6 @@ public class GalleryData {
      * @return
      */
     public ImageGalleryTableModel createModel(boolean[] selection) {
-    	
         try {
             switch (mode) {
                 case GALLERY_VOL:
@@ -1206,7 +1209,6 @@ public class GalleryData {
      * Delete from metadata selected items
      */
     public void removeSelection(boolean[] selection) throws Exception {
-
         for (int i = 0; i < selection.length; i++) {
             if (selection[i]) {
                 md.removeObject(ids[i]);
@@ -1743,24 +1745,30 @@ public class GalleryData {
             
             String psd = md.getPSDFile(id);
             String psden = md.getPSDEnhanced(id);
-            ImageGeneric img;
-            if(psden != null)
-                img = new ImageGeneric(psden);
-            else
-                img = new ImageGeneric(psd);
-            ImagePlus imp = XmippImageConverter.readToImagePlus(img);
-            
-            
-            if (profile) {
-                if( psden == null)
-                    new CTFAnalyzerJFrame(imp, md.getCTFDescription(id), psd, md.getEllipseCTF(id).getSamplingRate());
+
+            boolean noPsdEnhanced = (psden == null);
+            // Use the same PSD image in case no PSD enhanced
+
+            if (noPsdEnhanced)
+                psden = psd;
+
+            if (profile)
+            {
+                if (noPsdEnhanced)
+                    new CTFAnalyzerJFrame(psden, md.getCTFDescription(id), psd, md.getEllipseCTF(id).getSamplingRate());
                 else
-                    new CTFAnalyzerJFrame(imp, md.getCTFFile(id), psd);
-            } else {
+                    new CTFAnalyzerJFrame(psden, md.getCTFFile(id), psd);
+            }
+            else
+            {
+                ImageGeneric img = new ImageGeneric(psden);
+                ImagePlus imp = XmippImageConverter.readToImagePlus(img);
+                img.destroy();
                 EllipseCTF ctfparams = md.getEllipseCTF(id, imp.getWidth());
                 String sortfn = createSortFile(psd, row);
-                XmippUtil.showImageJ(Tool.VIEWER);// removed Toolbar.FREEROI
-                CTFRecalculateImageWindow ctfiw = new CTFRecalculateImageWindow(this, selection, imp, psd, ctfparams, ctfTasks, row, sortfn);
+                XmippUtil.showImageJ(Tool.VIEWER); // removed Toolbar.FREEROI
+                CTFRecalculateImageWindow ctfiw = new CTFRecalculateImageWindow(this, selection, imp, psd, ctfparams,
+                                                                                ctfTasks, row, sortfn);
             }
 
         } catch (Exception e) {

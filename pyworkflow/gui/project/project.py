@@ -35,6 +35,8 @@ It is composed by three panels:
 import os, sys
 import threading
 import shlex
+import subprocess
+
 from pyworkflow.utils import envVarOn, getLocalHostName, getLocalUserName
 from pyworkflow.manager import Manager
 from pyworkflow.config import MenuConfig, ProjectSettings
@@ -43,11 +45,13 @@ from pyworkflow.gui import Message
 from pyworkflow.gui.browser import FileBrowserWindow
 from pyworkflow.em.plotter import plotFile
 from pyworkflow.gui.plotter import Plotter
-from pyworkflow.gui.text import _open_cmd
+from pyworkflow.gui.text import _open_cmd, openTextFileEditor
 import SocketServer
 
 # Import possible Object commands to be handled
-from pyworkflow.em.showj import OBJCMD_NMA_PLOTDIST, OBJCMD_NMA_VMD, OBJCMD_MOVIE_ALIGNPOLAR, OBJCMD_MOVIE_ALIGNCARTESIAN, OBJCMD_MOVIE_ALIGNPOLARCARTESIAN, OBJCMD_CTFFIND4
+from pyworkflow.em.showj import (OBJCMD_NMA_PLOTDIST, OBJCMD_NMA_VMD, 
+                                 OBJCMD_MOVIE_ALIGNCARTESIAN, OBJCMD_CTFFIND4,
+                                 OBJCMD_GCTF)
 from base import ProjectBaseWindow, VIEW_PROTOCOLS, VIEW_PROJECTS
 
 
@@ -77,6 +81,8 @@ class ProjectWindow(ProjectBaseWindow):
         projMenu.addSubMenu('Import workflow', 'load_workflow', icon='fa-download.png')
         projMenu.addSubMenu('Export tree graph', 'export_tree')
         projMenu.addSubMenu('', '') # add separator
+        projMenu.addSubMenu('Notes', 'notes', icon='fa-pencil.png')
+        projMenu.addSubMenu('', '') # add separator
         projMenu.addSubMenu('Exit', 'exit', icon='fa-sign-out.png')
 
         helpMenu = menu.addSubMenu('Help')
@@ -94,7 +100,6 @@ class ProjectWindow(ProjectBaseWindow):
         self.switchView(VIEW_PROTOCOLS)
 
         self.initProjectTCPServer()#Socket thread to communicate with clients
-
 
     def createHeaderFrame(self, parent):
         """Create the header and add the view selection frame at the right."""
@@ -132,6 +137,28 @@ class ProjectWindow(ProjectBaseWindow):
                           self, self.project.getPath(''), 
                           selectButton=None  # we will select nothing
                           ).show()
+
+    def onNotes(self):
+        if not all(var in os.environ for var in ['SCIPION_NOTES_PROGRAM',
+                                                 'SCIPION_NOTES_FILE',
+                                                 'SCIPION_NOTES_ARGS']):
+            return self.showError("Missing variables SCIPION_NOTES_* under\n"
+                                  "[VARIABLES] section in the configuration file\n"
+                                  "~/.config/scipion/scipion.conf")
+        args = []
+        # Program name
+        program = os.environ.get('SCIPION_NOTES_PROGRAM', None)
+        notesFile = self.project.getPath('Logs', os.environ['SCIPION_NOTES_FILE'])
+
+        if program:
+            args.append(program)
+            # Custom arguments
+            if os.environ.get('SCIPION_NOTES_ARGS', None):
+                args.append(os.environ['SCIPION_NOTES_ARGS'])
+            args.append(notesFile)
+            subprocess.Popen(args) #nonblocking
+        else:
+            openTextFileEditor(notesFile)
 
     def onRemoveTemporaryFiles(self):
         # Project -> Remove temporary files
@@ -172,7 +199,8 @@ class ProjectWindow(ProjectBaseWindow):
             print "\nexport SCIPION_TREE_NAME=0 # to use ids instead of names"
 
     def initProjectTCPServer(self):
-        server = ProjectTCPServer((self.project.address, self.project.port), ProjectTCPRequestHandler)
+        server = ProjectTCPServer((self.project.address, self.project.port),
+                                  ProjectTCPRequestHandler)
         server.project = self.project
         server.window = self
         server_thread = threading.Thread(target=server.serve_forever)
@@ -184,39 +212,44 @@ class ProjectWindow(ProjectBaseWindow):
         self.enqueue(lambda: plotFile(path, *args).show())    
 
     def runObjectCommand(self, cmd, inputStrId, objStrId):
-        from pyworkflow.em.packages.xmipp3.nma.viewer_nma import createDistanceProfilePlot
-        from pyworkflow.em.packages.xmipp3.protocol_movie_alignment import createPlots, PLOT_POLAR, PLOT_CART, PLOT_POLARCART
-        from pyworkflow.em.packages.xmipp3.nma.viewer_nma import createVmdView
-        objId = int(objStrId)
-        project = self.project
-        if os.path.isfile(inputStrId) and os.path.exists(inputStrId):
-            from pyworkflow.em import loadSetFromDb
-            inputObj = loadSetFromDb(inputStrId)
-        else:
-            inputId = int(inputStrId)
-            inputObj = project.mapper.selectById(inputId)
-
-        #Plotter.setBackend('TkAgg')
-        if cmd == OBJCMD_NMA_PLOTDIST:
-            self.enqueue(lambda: createDistanceProfilePlot(inputObj, modeNumber=objId).show())
-
-        elif cmd == OBJCMD_NMA_VMD:
-            vmd = createVmdView(inputObj, modeNumber=objId)
-            vmd.show()
-
-        elif cmd == OBJCMD_MOVIE_ALIGNPOLAR:
-            self.enqueue(lambda: createPlots(PLOT_POLAR, inputObj, objId))
-
-        elif cmd == OBJCMD_MOVIE_ALIGNCARTESIAN:
-            self.enqueue(lambda: createPlots(PLOT_CART, inputObj, objId))
-
-        elif cmd == OBJCMD_MOVIE_ALIGNPOLARCARTESIAN:
-            self.enqueue(lambda: createPlots(PLOT_POLARCART, inputObj, objId))
-        
-        elif cmd == OBJCMD_CTFFIND4:
-            from pyworkflow.em.packages.grigoriefflab.viewer import createCtfPlot
-            self.enqueue(lambda: createCtfPlot(inputObj, objId))
+        try:
+            from pyworkflow.em.packages.xmipp3.nma.viewer_nma import createDistanceProfilePlot
+            from pyworkflow.em.packages.xmipp3.protocol_movie_alignment import createPlots 
+            from pyworkflow.em.protocol.protocol_movies import PLOT_CART
+            from pyworkflow.em.packages.xmipp3.nma.viewer_nma import createVmdView
+            objId = int(objStrId)
+            project = self.project
+            if os.path.isfile(inputStrId) and os.path.exists(inputStrId):
+                from pyworkflow.em import loadSetFromDb
+                inputObj = loadSetFromDb(inputStrId)
+            else:
+                inputId = int(inputStrId)
+                inputObj = project.mapper.selectById(inputId)
+            #Plotter.setBackend('TkAgg')
+            if cmd == OBJCMD_NMA_PLOTDIST:
+                self.enqueue(lambda: createDistanceProfilePlot(inputObj, modeNumber=objId).show())
     
+            elif cmd == OBJCMD_NMA_VMD:
+                vmd = createVmdView(inputObj, modeNumber=objId)
+                vmd.show()
+
+            elif cmd == OBJCMD_MOVIE_ALIGNCARTESIAN:
+                self.enqueue(lambda: createPlots(PLOT_CART, inputObj, objId))
+
+            elif cmd == OBJCMD_CTFFIND4:
+                from pyworkflow.em.packages.grigoriefflab.viewer import createCtfPlot
+                self.enqueue(lambda: createCtfPlot(inputObj, objId))
+
+            elif cmd == OBJCMD_GCTF:
+                from pyworkflow.em.packages.gctf.viewer import createCtfPlot
+
+        except Exception, ex:
+            print "There was an error executing object command !!!:"
+            print  ex
+    
+
+
+
     def recalculateCTF(self, inputObjId, sqliteFile):
         """ Load the project and launch the protocol to
         create the subset.
@@ -258,6 +291,7 @@ class ProjectManagerWindow(ProjectBaseWindow):
         confMenu.addSubMenu('General', 'general')
         confMenu.addSubMenu('Hosts', 'hosts')
         confMenu.addSubMenu('Protocols', 'protocols')
+        confMenu.addSubMenu('User', 'user')
 
         helpMenu = menu.addSubMenu('Help')
         helpMenu.addSubMenu('Online help', 'online_help', icon='fa-external-link.png')
@@ -289,7 +323,6 @@ class ProjectManagerWindow(ProjectBaseWindow):
 
     def onGeneral(self):
         # Config -> General
-        _open_cmd('%s/.config/scipion/scipion.conf' % os.environ['HOME'])
         _open_cmd('%s/config/scipion.conf' % os.environ['SCIPION_HOME'])
 
     def onHosts(self):
@@ -304,11 +337,13 @@ class ProjectManagerWindow(ProjectBaseWindow):
         if os.path.exists('%s/.config/scipion/protocols.conf' % os.environ['HOME']):
             _open_cmd('%s/.config/scipion/protocols.conf' % os.environ['HOME'])
 
+    def onUser(self):
+        # Config -> User
+        _open_cmd('%s/.config/scipion/scipion.conf' % os.environ['HOME'])
 
 
 class ProjectTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     pass
-
 
 
 class ProjectTCPRequestHandler(SocketServer.BaseRequestHandler):

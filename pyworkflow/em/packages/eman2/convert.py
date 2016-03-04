@@ -41,7 +41,7 @@ from os.path import join, exists
 import pyworkflow as pw
 import pyworkflow.em as em
 from pyworkflow.em.data import Coordinate
-from pyworkflow.em.packages.eman2 import getEmanCommand, loadJson, getEnviron
+from pyworkflow.em.packages.eman2 import getEmanCommand, getEnviron
 from pyworkflow.utils.path import createLink, removeBaseExt, replaceBaseExt, cleanPath
 
 
@@ -51,6 +51,20 @@ from pyworkflow.utils.path import createLink, removeBaseExt, replaceBaseExt, cle
 #                xmipp.LABEL_INT: int,
 #                xmipp.LABEL_BOOL: bool              
 #                }
+
+#     @static
+def loadJson(jsonFn):
+    """ This function loads the Json dictionary into memory """
+    jsonFile = open(jsonFn)
+    jsonDict = json.load(jsonFile)
+    jsonFile.close()
+    return jsonDict
+
+ 
+def writeJson(jsonDict, jsonFn):
+    """ This function write a Json dictionary """
+    with open(jsonFn, 'w') as outfile:
+        json.dump(jsonDict, outfile)
 
 
 def objectToRow(obj, row, attrDict):
@@ -174,19 +188,18 @@ def writeSetOfParticles(partSet, path, **kwargs):
     partSet.getFirstItem().getFileName()
     fileName = ""
     a = 0
-    tmpMicId = 0
 #     listHdf = []
+    proc = createEmanProcess(args='write')
     for i, part in iterParticlesByMic(partSet):
         micId = part.getMicId()
-        if micId != tmpMicId:
-            tmpMicId = micId
-            if not micId:
-                micId = 0
-            hdfFn = os.path.join(path, "mic_%0.6d.hdf" % micId)
-#             listHdf.append(basename(hdfFn))
-            proc = createEmanProcess(args='write %s' % hdfFn)
-        
         objDict = part.getObjDict()
+        
+        if not micId:
+            micId = 0
+        
+        objDict['hdfFn'] = os.path.join(path, "mic_%0.6d.hdf" % micId)
+#             listHdf.append(basename(hdfFn))
+        
         alignType = kwargs.get('alignType')
 #         print "objDict, ", objDict
     
@@ -215,7 +228,7 @@ def writeSetOfParticles(partSet, path, **kwargs):
         print >> proc.stdin, json.dumps(objDict)
         proc.stdin.flush()
         proc.stdout.readline()
-#     return listHdf
+    proc.kill()
 
 
 def readSetOfParticles(filename, partSet, **kwargs):

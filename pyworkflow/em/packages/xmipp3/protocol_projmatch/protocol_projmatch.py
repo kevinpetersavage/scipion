@@ -25,9 +25,6 @@
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package implement projection matching using xmipp 3.1
-"""
 
 import xmipp
 from pyworkflow.object import Integer
@@ -211,15 +208,17 @@ class XmippProtProjMatch(ProtRefine3D, ProtClassify3D):
     
     def _validate(self):
         errors = []
-        if self.doCTFCorrection and not self.doAutoCTFGroup and not exists(self.setOfDefocus.get()):
+
+        if (self.doCTFCorrection and not self.doAutoCTFGroup
+            and not exists(self.setOfDefocus.get())):
             errors.append("Error: for non-automated ctf grouping, please provide a docfile!")
-        if self.numberOfMpi<=1:
+
+        if self.numberOfMpi <= 1:
             errors.append("The number of MPI processes has to be larger than 1")
         
-        xDimImg = self.inputParticles.get().getXDim()
-        xDimVol, _, _ = self.input3DReferences.get().getDim()
-        if xDimImg != xDimVol:
-            errors.append("The dimensions of the volume(s) and particles must be equal!!!!")
+        self._validateDim(self.inputParticles.get(), self.input3DReferences.get(),
+                          errors, 'Input particles', 'Reference volume')
+
         return errors
     
     def _citations(self):
@@ -375,12 +374,14 @@ class XmippProtProjMatch(ProtRefine3D, ProtClassify3D):
         return self._lastIter.get()
     
     def _fillParticlesFromIter(self, partSet, iteration):
+        print("_fillParticlesFromIter")
         import pyworkflow.em.metadata as md
         
         imgSet = self.inputParticles.get()
         imgFn = "all_exp_images@" + self._getFileName('docfileInputAnglesIters', iter=iteration, ref=1)
         partSet.copyInfo(imgSet)
         partSet.setAlignmentProj()
+        
         partSet.copyItems(imgSet,
                             updateItemCallback=self._createItemMatrix,
                             itemDataIterator=md.iterRows(imgFn, sortByLabel=md.MDL_ITEM_ID))

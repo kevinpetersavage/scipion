@@ -34,10 +34,10 @@ from pyworkflow.protocol import Protocol
 from pyworkflow.object import Set
 from pyworkflow.em.data import (SetOfMicrographs, SetOfCoordinates, SetOfParticles,
                                 SetOfClasses2D, SetOfClasses3D, SetOfClassesVol,
-                                SetOfVolumes, SetOfCTF, SetOfMovies,
+                                SetOfVolumes, SetOfCTF, SetOfMovies, SetOfFSCs,
                                 SetOfMovieParticles, SetOfAverages, SetOfNormalModes)
 from pyworkflow.em.constants import RELATION_SOURCE, RELATION_TRANSFORM, RELATION_CTF
-from pyworkflow.em.data_tiltpairs import SetOfAngles
+from pyworkflow.em.data_tiltpairs import SetOfAngles, CoordinatesTiltPair
 from pyworkflow.utils.path import cleanPath
 from pyworkflow.mapper.sqlite_db import SqliteDb
 
@@ -49,8 +49,8 @@ class EMProtocol(Protocol):
     """
     _base = True
     
-    def __init__(self, **args):
-        Protocol.__init__(self, **args)
+    def __init__(self, **kwargs):
+        Protocol.__init__(self, **kwargs)
         
     def __createSet(self, SetClass, template, suffix):
         """ Create a set and set the filename using the suffix. 
@@ -113,6 +113,9 @@ class EMProtocol(Protocol):
     
     def _createSetOfAngles(self, suffix=''):
         return self.__createSet(SetOfAngles, 'tiltpairs_angles%s.sqlite', suffix)
+
+    def _createSetOfFSCs(self, suffix=''):
+        return self.__createSet(SetOfFSCs, 'fscs%s.sqlite', suffix)
        
     def _defineSourceRelation(self, srcObj, dstObj):
         """ Add a DATASOURCE relation between srcObj and dstObj """
@@ -140,18 +143,25 @@ class EMProtocol(Protocol):
             errors: an error list where to append the error if not same dimensions
             label1, label2: labels for input objects used for the error message.
         """
-        d1 = obj1.getDim()
-        d2 = obj2.getDim()
-        if d1 != d2:
-            msg = '%s and %s have not the same dimensions, \n' % (label1, label2)
-            msg += 'which are %d and %d, respectively' % (d1, d2)
-            errors.append(msg)
+        if obj1 is not None and obj2 is not None:
+            d1 = obj1.getXDim()
+            d2 = obj2.getXDim()
+
+            if d1 is None:
+                errors.append("Can not get dimensions from %s." % label1)
+            elif d2 is None:
+                errors.append("Can not get dimensions from %s." % label2)
+            elif d1 != d2:
+                msg = '%s and %s have not the same dimensions, \n' % (label1, label2)
+                msg += 'which are %d and %d, respectively' % (d1, d2)
+                errors.append(msg)
             
     def __str__(self):
         return self.getObjLabel()
     
     def allowsDelete(self, obj):
-        if isinstance(obj, SetOfCoordinates):
+        if (isinstance(obj, SetOfCoordinates) or
+            isinstance(obj, CoordinatesTiltPair)):
             return True
         return False
         

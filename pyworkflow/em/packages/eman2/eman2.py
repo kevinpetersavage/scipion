@@ -23,9 +23,6 @@
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This sub-package will contains Eman3.0 specific protocols
-"""
 
 import os
 from os.path import join
@@ -49,12 +46,24 @@ def getEnviron():
 
 def getVersion():
     path = os.environ['EMAN2DIR']
-    if '2.11' in path:
-        return '2.11'
-    elif '2.12' in path:
-        return '2.12'
-    else:
-        return ''
+    for v in getSupportedVersions():
+        if v in path:
+            return v
+    return ''
+
+
+def getSupportedVersions():
+    return ['2.11', '2.12']
+
+
+def validateVersion(protocol, errors):
+    """ Validate if eman version is set properly according
+     to installed version and the one set in the config file.
+     Params:
+        protocol: the input protocol calling to validate
+        errors: a list that will be used to add the error message.
+    """
+    protocol.validatePackageVersion('EMAN2DIR', errors)
 
 
 def getEmanProgram(program):

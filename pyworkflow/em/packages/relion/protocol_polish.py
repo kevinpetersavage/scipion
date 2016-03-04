@@ -38,10 +38,10 @@ from protocol_base import ProtRelionBase
 from convert import getEnviron
 
 class ProtRelionPolish(ProtProcessParticles, ProtRelionBase):
-    """    
-    Reconstruct a volume using Relion from a given set of particles.
-    The alignment parameters will be converted to a Relion star file
-    and used as direction projections to reconstruct.
+    """
+    This Relion protocol tracks particle movement in movie frames,
+    applies a resolution and dose-dependent weighting scheme
+    for each frame and finally sums them together.
     """
     _label = 'particle polishing'
     
@@ -216,9 +216,12 @@ class ProtRelionPolish(ProtProcessParticles, ProtRelionBase):
         return summary message for NORMAL EXECUTION. 
         """
         errors = []
+        self.validatePackageVersion('RELION_HOME', errors)
+
         if self.performBfactorWeighting:
             if self.maskForReconstructions.get() is None:
                 errors.append('You should select a *mask* if performing b-factor weighting.')
+
         return errors
     
     def _summary(self):

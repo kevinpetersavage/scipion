@@ -579,6 +579,7 @@ class ProtRelionBase(EMProtocol):
                                     postprocessImageRow=self._postprocessImageRow)
                 mdMovies = md.MetaData(self._getFileName('movie_particles'))
                 mdParts = md.MetaData(self._getFileName('input_star'))
+
                 if getVersion() == "1.4":
                     mdParts.renameColumn(md.RLN_IMAGE_NAME, md.RLN_PARTICLE_ORI_NAME)
                 else:
@@ -605,11 +606,8 @@ class ProtRelionBase(EMProtocol):
     #--------------------------- INFO functions -------------------------------------------- 
     def _validate(self):
         errors = []
-        if not getVersion():
-            errors.append("We couldn't detect Relion version. ")
-            errors.append("Please, check your configuration file and change RELION_HOME.")
-            errors.append("The path should contains either '1.3' or '1.4' ")
-            errors.append("to properly detect the version.")
+        self.validatePackageVersion('RELION_HOME', errors)
+
         if self.doContinue:
             continueProtocol = self.continueRun.get()
             if (continueProtocol is not None and
@@ -644,17 +642,20 @@ class ProtRelionBase(EMProtocol):
     
     def _summary(self):
         self._initialize()
-        iterMsg = 'Iteration %d' % self._lastIter()
-        if self.hasAttribute('numberOfIterations'):
-            iterMsg += '/%d' % self._getnumberOfIters()
-        summary = [iterMsg]
-        
-        if self._getInputParticles().isPhaseFlipped():
-            msg = "Your images have been ctf-phase corrected"
+
+        lastIter = self._lastIter()
+
+        if lastIter is not None:
+            iterMsg = 'Iteration %d' % lastIter
+            if self.hasAttribute('numberOfIterations'):
+                iterMsg += '/%d' % self._getnumberOfIters()
         else:
-            msg = "Your images have not been ctf-phase corrected"
-        
-        summary += [msg]
+            iterMsg = 'No iteration finished yet.'
+        summary = [iterMsg]
+
+        flip = '' if self._getInputParticles().isPhaseFlipped() else 'not '
+        flipMsg = "Your images have %sbeen ctf-phase corrected" % flip
+        summary.append(flipMsg)
         
         if self.doContinue:
             summary += self._summaryContinue()

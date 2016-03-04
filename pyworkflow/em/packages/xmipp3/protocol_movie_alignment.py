@@ -51,7 +51,7 @@ AL_CROSSCORRELATION = 4
 AL_CROSSCORRELATIONOPTICAL = 5
 
 class ProtMovieAlignment(ProtProcessMovies):
-    """ Aligns movies, from direct detectors cameras, into micrographs.
+    """ Aligns movies from direct detectors cameras and sums them into micrographs.
     """
     _label = 'movie alignment'
 
@@ -68,11 +68,13 @@ class ProtMovieAlignment(ProtProcessMovies):
                                                         ],
                       label="Alignment method", default=AL_OPTICAL,
                       display=EnumParam.DISPLAY_COMBO,
-                      help='Method to use for movie alignment. '
-                           'dosefgpu requires a GPU. Croscorrelation '
-                           'and dosefgpu with default parameters are equivalent. '
-                           'Croscorrelation is a CPU implementation of dosefgpu  '
-                           'with limited functionality (only aligns whole frames)'
+                      help='Method to use for movie alignment:\n'
+                           '1. dosefgpu performs in-plane drift correction and requires a GPU.\n'
+                           '2. Croscorrelation is a CPU implementation of dosefgpu '
+                           'with limited functionality (only aligns whole frames). With default parameters '
+                           'it is equivalent to dosefgpu.\n'
+                           '3. Optical flow works best for correction of local beam-induced motion.\n'
+                           '4. Average will simply sum the frames together.'
                       )
 
         # GROUP COMMON PARAMETERS
@@ -80,10 +82,10 @@ class ProtMovieAlignment(ProtProcessMovies):
         
         line = group.addLine('Used in alignment',
                             help='First and last frames used in alignment.\n'
-                                  'The first frame in the stack is *0*.' )
+                                  'The first frame in the stack is *0* ' 
+                                  'If the last frame is *0*, use maximum value' )
         line.addParam('alignFrame0', IntParam, default=0, label='First')
-        line.addParam('alignFrameN', IntParam, default=0, label='Last',
-                      help='If *0*, use maximum value')
+        line.addParam('alignFrameN', IntParam, default=0, label='Last')
         
         # GROUP GPU PARAMETERS
         group = form.addGroup('GPU',condition="alignMethod==%d or (alignMethod==%d and expertLevel==%d)"
@@ -156,7 +158,7 @@ class ProtMovieAlignment(ProtProcessMovies):
                                                                    AL_CROSSCORRELATIONOPTICAL\
                        ),
                        label='Filter at (A)',
-                       help='1x or 2x. Bin stack before processing.')
+                       help='Maximum frequency for a low pass filter')
 
 
         group.addParam('extraParams', StringParam, default='',
@@ -208,14 +210,13 @@ class ProtMovieAlignment(ProtProcessMovies):
                 alignedMovie.setFileName(self._getExtraPath(self._getNameExt(movie.getFileName(),'_aligned', 'mrcs')))
             ####>>>This is wrong. Save an xmipp metadata
             alignedMovie.alignMetaData = String(self._getExtraPath(metadataName))
-            #alignedMovie.plotPolar = self._getExtraPath(plotPolarName)
             alignedMovie.plotCart = self._getExtraPath(plotCartName)
             alignedMovie.psdCorr = self._getExtraPath(psdCorrName)
             
-            if (alMethod == AL_OPTICAL or 
+            '''if (alMethod == AL_OPTICAL or
                 alMethod == AL_DOSEFGPUOPTICAL or 
                 alMethod == AL_CROSSCORRELATIONOPTICAL):
-                movieCreatePlot(alignedMovie, True)
+                movieCreatePlot(alignedMovie, True)'''
             
             if self.doSaveMovie:
                 movieSet.append(alignedMovie)
@@ -232,9 +233,10 @@ class ProtMovieAlignment(ProtProcessMovies):
                 alMethod == AL_DOSEFGPUOPTICAL or 
                 alMethod == AL_CROSSCORRELATIONOPTICAL):
 
-                #mic.plotPolar = em.Image()
+                mic.alignMetaData = String(self._getExtraPath(metadataName))
+                mic.plotCart = self._getExtraPath(plotCartName)
+                movieCreatePlot(mic, True)
                 mic.plotCart = em.Image()
-                #mic.plotPolar.setFileName(self._getExtraPath(plotPolarName))
                 mic.plotCart.setFileName(self._getExtraPath(plotCartName))
             #if alMethod != AL_DOSEFGPU and alMethod != AL_CROSSCORRELATION:
             mic.psdCorr = em.Image()
@@ -389,7 +391,7 @@ class ProtMovieAlignment(ProtProcessMovies):
                 lastFrame = 0
             elif alMethod == AL_CROSSCORRELATIONOPTICAL:
                 program = 'xmipp_movie_optical_alignment_cpu'
-                command = '-i %(movieName)s --globalShifts %(metadataNameInterMediate)s ' % locals()
+                command = '-i %(corrMovieName)s ' % locals()
             else:
                 command = '-i %(movieName)s%(movieSuffix)s ' % locals()
                 if self.doGPU:
@@ -529,20 +531,20 @@ class ProtMovieAlignment(ProtProcessMovies):
 
         return summary
 
-def createPlots(plotType, protocol, movieId):
+def createPlots(plotType, protocol, micId):
+    print "output Micrographs to create Plot %s" % protocol.outputMicrographs
+    mic = protocol.outputMicrographs[micId]
+    return movieCreatePlot(mic, False).show()
 
-    movie = protocol.outputMovies[movieId]
-    return movieCreatePlot(movie, False)
-
-def movieCreatePlot(movie, saveFig):
+def movieCreatePlot(mic, saveFig):
 
     import xmipp
     meanX = []
     meanY = []
     figureSize = (8, 6)
 
-    alignedMovie = movie.alignMetaData
-    md = xmipp.MetaData(alignedMovie)
+    #alignedMovie = mic.alignMetaData
+    md = xmipp.MetaData(mic.alignMetaData)
     plotter = Plotter(*figureSize)
     figure = plotter.getFigure()
 
@@ -565,7 +567,7 @@ def movieCreatePlot(movie, saveFig):
         ax.text(preX-0.02, preY+0.01, str(objId+1))
     ax.plot(np.asarray(meanX), np.asarray(meanY))
     if saveFig:
-        plotter.savefig(movie.plotCart)
+        plotter.savefig(mic.plotCart)
     return plotter
 
 

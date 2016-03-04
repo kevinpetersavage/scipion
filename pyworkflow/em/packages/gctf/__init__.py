@@ -1,8 +1,8 @@
 # **************************************************************************
 # *
-# * Authors:     Carlos Oscar Sorzano (coss@cnb.csic.es)
+# * Authors:     Grigory Sharov (sharov@igbmc.fr)
 # *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * L'Institut de genetique et de biologie moleculaire et cellulaire (IGBMC)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -20,25 +20,18 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'coss@cnb.csic.es'
+# *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
 """
 This sub-package contains data and protocol classes
-wrapping Pytom programs http://www.pytom.org
+wrapping Kai Zhang's GCTF program
 """
 from bibtex import _bibtex # Load bibtex dict with references
 
-_logo = 'pytomLogo.jpg'
+_logo = "gctf_logo.png"
 
-import convert
-
-
-_environ = convert.getEnviron()
-
-from protocol_import import ProtPyTomImport
-from protocol_autofocus_classify import ProtAutofocusClassify
-from protocol_frm_alignment import ProtFrmAlign
-
-from viewer import PyTomAutofocusViewer, PyTomFrmAlignmentViewer
-
+from protocol_gctf import ProtGctf
+from viewer import ProtGctfViewer
+# Wizards
+from wizard import GctfCTFWizard

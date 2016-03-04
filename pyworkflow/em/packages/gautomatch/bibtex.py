@@ -1,8 +1,9 @@
+# coding: latin-1
 # **************************************************************************
 # *
-# * Authors:     Antonio Poza Ballesteros (apoza@cnb.csic.es)
+# * Authors:     Grigory Sharov (sharov@igbmc.fr)
 # *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * L'Institut de genetique et de biologie moleculaire et cellulaire (IGBMC)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -20,18 +21,34 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'apoza@cnb.csic.es'
+# *  e-mail address 'coss@cnb.csic.es'
 # *
 # **************************************************************************
 """
-This modules contains basic hierarchy
-for specific Xmipp3 EM data objects
+Bibtex string file for Gautomatch package.
 """
 
-from pyworkflow.em import *   
-    
-class CTFFindModel(CTFModel):
-    """ CTFModel wrapper around the result file of ctffind3"""
-    pass
-        
-    
+_bibtexStr = """
+
+@Article{Zhang2016b,
+  Title      = {},
+  Author     = {Zhang K.},
+  Journal    = {unpublished},
+  Year       = {},
+  Pages      = {},
+  Volume     = {},
+  Number     = {},
+  Abstract   = {},
+  Doi        = {},
+  Language   = {},
+  Note	     = {unpublished},
+  PubMedID   = {},
+  ISSN       = {},
+  Url        = {http://www.mrc-lmb.cam.ac.uk/kzhang/Gautomatch}
+}
+
+"""
+
+from pyworkflow.utils import parseBibTex
+
+_bibtex = parseBibTex(_bibtexStr)  

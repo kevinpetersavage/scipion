@@ -23,24 +23,20 @@
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
 # **************************************************************************
-from pyworkflow.utils.process import runJob
-"""
-This sub-package contains wrapper around CL2D Xmipp program
-"""
 
 from os.path import join, dirname, exists
 from glob import glob
 
-import xmipp
-from pyworkflow.protocol.params import (PointerParam, IntParam, EnumParam, 
-                                        StringParam, FloatParam, 
+from pyworkflow.utils.process import runJob
+from pyworkflow.protocol.params import (PointerParam, IntParam, EnumParam,
+                                        StringParam, FloatParam,
                                         LEVEL_ADVANCED, LEVEL_ADVANCED,
-    BooleanParam)
+                                        BooleanParam)
 from pyworkflow.em.protocol import ProtClassify2D, SetOfClasses2D
 from pyworkflow.utils.path import cleanPath, makePath
 import pyworkflow.em as em
-
 from convert import writeSetOfParticles, readSetOfClasses2D, writeSetOfClasses2D
+import xmipp
 
 # Comparison methods enum
 CMP_CORRELATION = 0
@@ -142,7 +138,9 @@ class XmippProtCL2D(ProtClassify2D):
         # Convert input images if necessary
         self.imgsFn = self._getExtraPath('images.xmd')
         self.initialClassesFn = self._getExtraPath('initialClasses.xmd')
-        self._insertFunctionStep('convertInputStep')
+        self._insertFunctionStep('convertInputStep', 
+                                 self.inputParticles.get().getObjId(), 
+                                 self.initialClasses.get().getObjId() if self.initialClasses.get() else None)
 
         # Prepare arguments to call program: xmipp_classify_CL2D
         self._params = {'imgsFn': self.imgsFn,
@@ -201,7 +199,7 @@ class XmippProtCL2D(ProtClassify2D):
         self._insertFunctionStep('createOutputStep', subset)
 
     #--------------------------- STEPS functions --------------------------------------------
-    def convertInputStep(self):
+    def convertInputStep(self, particlesId, classesId):
         writeSetOfParticles(self.inputParticles.get(),self.imgsFn,alignType=em.ALIGN_NONE)
         if not self.randomInitialization:
             if isinstance(self.initialClasses.get(), SetOfClasses2D):
@@ -221,7 +219,8 @@ class XmippProtCL2D(ProtClassify2D):
             self.runJob("xmipp_image_sort", params, numberOfMpi=nproc)
             mdFnOut = fnRoot + ".xmd"
             md = xmipp.MetaData(mdFnOut)
-            md.addItemId()
+            for objId in md:
+                md.setValue(xmipp.MDL_ITEM_ID,long(md.getValue(xmipp.MDL_REF,objId)),objId)
             md.write("classes_sorted@" + mdFn, xmipp.MD_APPEND)
 
     def evaluateClassesStep(self, subset=''):
@@ -248,7 +247,7 @@ class XmippProtCL2D(ProtClassify2D):
         lastMdFn = levelMdFiles[-1]
         inputParticles = self.inputParticles.get()
         classes2DSet = self._createSetOfClasses2D(inputParticles, subset)
-        readSetOfClasses2D(classes2DSet, lastMdFn, 'classes_sorted')
+        readSetOfClasses2D(classes2DSet, lastMdFn, 'classes')
         result = {'outputClasses' + subset: classes2DSet}
         self._defineOutputs(**result)
         self._defineSourceRelation(self.inputParticles, classes2DSet)
