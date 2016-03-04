@@ -745,7 +745,7 @@ void AdmmKernel::convolveKernelWithItself(double _autocorrStep)
 		A2D_ELEM(FourierProjectionAutocorr,i,j)*=A2D_ELEM(FourierProjectionAutocorr,i,j)*K;
 
 //  Debugging code
-//	  transformer.inverseFourierTransform();
+//    transformer.inverseFourierTransform();
 //    Image<double> save;
 //    save()=projectionAutocorrWithCTF;
 //    save.write("PPPautocorrelationWithoutCTF.xmp");
