@@ -30,6 +30,8 @@ from pyworkflow.em.data import Volume
 from pyworkflow.em.protocol import ProtReconstruct3D
 from pyworkflow.em.packages.xmipp3.convert import writeSetOfParticles
 from pyworkflow.utils.path import cleanPath
+from pyworkflow.em.metadata.utils import getFirstRow
+import xmipp
 
 class XmippProtReconstructADMM(ProtReconstruct3D):
     """    
@@ -82,7 +84,10 @@ class XmippProtReconstructADMM(ProtReconstruct3D):
     def _insertAllSteps(self):
         self._createFilenameTemplates()
         self._insertFunctionStep('convertInputStep')
+        #self._insertFunctionStep('correctCTFStep')
         self._insertFunctionStep('reconstructHtbStep')
+        self._insertFunctionStep('reconstructHtHStep')
+        self._insertFunctionStep('reconstructAdmmStep')
 #         self._insertFunctionStep('createOutputStep')
         
         
@@ -91,7 +96,10 @@ class XmippProtReconstructADMM(ProtReconstruct3D):
         fnParticles = self._getFileName('input_xmd')
         imgSet = self.inputParticles.get()
         writeSetOfParticles(imgSet, fnParticles)
-
+        row=getFirstRow(fnParticles)
+        if row.containsLabel(xmipp.MDL_CTF_DEFOCUSU) and not row.containsLabel(xmipp.MDL_CTF_K):
+            self.runJob("xmipp_metadata_utilities",'-i %s --fill ctfK constant 1'%fnParticles,numberOfMpi=1)
+            
         fnAligned = self._getExtraPath("imagesAligned.xmd")
         fnAlignedStk = self._getExtraPath("imagesAligned.stk")
         self.runJob("xmipp_metadata_utilities",'-i %s -o %s --operate keep_column "itemId image shiftX shiftY"'%(fnParticles,fnAligned),numberOfMpi=1)
@@ -124,24 +132,69 @@ class XmippProtReconstructADMM(ProtReconstruct3D):
         cleanPath(fnAllAngles)
         cleanPath(fnParticles)
 
+    def getDigRes(self):
+        maxRes = self.maxRes.get()
+        if maxRes == -1:
+            digRes = 0.5
+        else:
+            digRes = self.inputParticles.get().getSamplingRate() / self.maxRes.get()
+        return digRes
+
     def reconstructHtbStep(self):
         """ Create the input file in STAR format as expected by Xmipp.
         If the input particles comes from Xmipp, just link the file. 
         """
         params =  '  -i %s' % self._getExtraPath("imagesAligned.xmd")
         params += '  -o %s' % self._getExtraPath('Htb.vol')
-        maxRes = self.maxRes.get()
-        if maxRes == -1:
-            digRes = 0.5
-        else:
-            digRes = self.inputParticles.get().getSamplingRate() / self.maxRes.get()
-        params += ' --max_resolution %0.3f' %digRes
+        params += ' --max_resolution %0.3f' %self.getDigRes()
         params += ' --padding %0.3f' % self.pad.get()
         params += ' --thr %d' % self.numberOfThreads.get()
         params += ' --sampling %f' % self.inputParticles.get().getSamplingRate()
         params += ' --iter 0'
         self.runJob('xmipp_reconstruct_fourier', params)
             
+    def correctCTFStep(self):
+        params =  '  -i %s --sampling_rate %f --correct_envelope' % (self._getExtraPath("imagesAligned.xmd"),self.inputParticles.get().getSamplingRate())
+        if self.inputParticles.get().isPhaseFlipped():
+            params += " --phase_flipped"
+        self.runJob('xmipp_ctf_correct_wiener2d', params)
+
+    def reconstructHtHStep(self):
+        I = xmipp.Image()
+        I.setDataType(xmipp.DT_DOUBLE)
+        I.initLPFImpulseResponse(2*self.inputParticles.get().getDimensions()[0]-1,self.getDigRes())
+        fnKernel = self._getExtraPath("kernel.xmp")
+        I.write(fnKernel)
+
+        fnKernelXmd = self._getExtraPath("kernel.xmd")
+        params =  '  -i %s -o %s --fill image constant %s' % (self._getExtraPath("imagesAligned.xmd"),fnKernelXmd,fnKernel)
+        self.runJob('xmipp_metadata_utilities', params, numberOfMpi=1)
+        
+        params =  '  -i %s' % fnKernelXmd
+        params += '  -o %s' % self._getExtraPath('HtH.vol')
+        params += ' --max_resolution %0.3f' %self.getDigRes()
+        params += ' --padding %0.3f' % self.pad.get()
+        params += ' --thr %d' % self.numberOfThreads.get()
+        params += ' --sampling %f' % self.inputParticles.get().getSamplingRate()
+        params += ' --iter 0'
+        self.runJob('xmipp_reconstruct_fourier', params)
+        
+    def reconstructAdmmStep(self):
+        """ Create the input file in STAR format as expected by Xmipp.
+        If the input particles comes from Xmipp, just link the file. 
+        """
+        params =  ' -i %s' % self._getExtraPath("imagesAligned.xmd")
+        params += ' --oroot %s' % self._getExtraPath('admm')
+        params += ' --Htb %s'%self._getExtraPath('Htb.vol')
+        params += ' --HtKH %s'%self._getExtraPath('HtH.vol')
+        params += ' --positivity'
+        #params += ' --firstVolume %s' %self._getExtraPath('Htb.vol')
+        params += ' --cgiter 2'
+        params += ' --admmiter 30'
+        params += ' --lambda 1e4'
+        params += ' --mu 1e4'
+        self.runJob('xmipp_reconstruct_admm2', params,numberOfMpi=1)
+
     def createOutputStep(self):
         imgSet = self.inputParticles.get()
         volume = Volume()
