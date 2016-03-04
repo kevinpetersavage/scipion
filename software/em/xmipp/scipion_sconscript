@@ -552,6 +552,7 @@ for p in ['angular_break_symmetry',
           'phantom_transform',
 
           'reconstruct_admm',
+          'reconstruct_admm2',
           'reconstruct_art',
           'reconstruct_art_pseudo',
           'reconstruct_art_xray',
