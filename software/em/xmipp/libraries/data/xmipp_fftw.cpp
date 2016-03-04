@@ -901,3 +901,23 @@ void randomizePhases(MultidimArray<double> &Min, double wRandom)
     }
 	transformer.inverseFourierTransform();
 }
+
+void lpfImpulseResponse(MultidimArray<double> &Min, int imageSize, double wMax)
+{
+	FourierTransformer transformer;
+	MultidimArray< std::complex<double> > F;
+	Min.initZeros(imageSize,imageSize);
+	transformer.FourierTransform(Min,F,false);
+
+	Matrix1D<double> f(2);
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(F)
+    {
+        FFT_IDX2DIGFREQ(j,XSIZE(Min), XX(f));
+        FFT_IDX2DIGFREQ(i,YSIZE(F), YY(f));
+        double w=f.module();
+        if (w <= wMax)
+        	DIRECT_A2D_ELEM(F,i,j)=1;
+    }
+	transformer.inverseFourierTransform();
+	CenterFFT(Min,true);
+}

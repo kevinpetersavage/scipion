@@ -671,5 +671,9 @@ void adaptSpectrum(MultidimArray<double> &Min,
  * @ingroup FourierOperations
 */
 void randomizePhases(MultidimArray<double> &Min, double wRandom);
+
+/** Low pass filter impulse response */
+void lpfImpulseResponse(MultidimArray<double> &Min, int imageSize, double wMax);
+
 #endif
 /** @} */
