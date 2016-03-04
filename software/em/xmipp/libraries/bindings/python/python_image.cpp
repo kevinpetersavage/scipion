@@ -25,6 +25,7 @@
 
 #include "xmippmodule.h"
 #include <data/ctf.h>
+#include <data/xmipp_fftw.h>
 
 /***************************************************************/
 /*                            Image                         */
@@ -121,6 +122,8 @@ PyMethodDef Image_methods[] =
           "Return a pixel value" },
         { "initConstant", (PyCFunction) Image_initConstant, METH_VARARGS,
           "Initialize to value" },
+		{ "initLPFImpulseResponse", (PyCFunction) Image_initLPFImpulseResponse, METH_VARARGS,
+		  "Initialize low pass filter impulse response" },
         { "mirrorY", (PyCFunction) Image_mirrorY, METH_VARARGS,
           "mirror image so up goes down" },
         { "applyTransforMatScipion", (PyCFunction) Image_applyTransforMatScipion, METH_VARARGS,
@@ -790,7 +793,34 @@ Image_initConstant(PyObject *obj, PyObject *args, PyObject *kwargs)
     return NULL;
 }//function Image_initConstant
 
-/* initConstant */
+/* initLPFImpulseResponse */
+PyObject *
+Image_initLPFImpulseResponse(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+    ImageObject *self = (ImageObject*) obj;
+    int imageSize=-1;
+    double wmax = -1;
+
+    if (self != NULL && PyArg_ParseTuple(args, "id", &imageSize, &wmax))
+    {
+        try
+        {
+            ImageGeneric *image = self->image;
+            image->convert2Datatype(DT_Double);
+            MultidimArray<double> * pImage=NULL;
+            MULTIDIM_ARRAY_GENERIC(*image).getMultidimArrayPointer(pImage);
+		    self->image->data->getMultidimArrayPointer(pImage);
+        	lpfImpulseResponse(*pImage, imageSize, wmax);
+            Py_RETURN_NONE;
+        }
+        catch (XmippError &xe)
+        {
+            PyErr_SetString(PyXmippError, xe.msg.c_str());
+        }
+    }
+    return NULL;
+}//function initLPFImpulseResponse
+
 PyObject *
 Image_mirrorY(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
@@ -805,7 +835,7 @@ Image_mirrorY(PyObject *obj, PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyXmippError, xe.msg.c_str());
     }
     return NULL;
-}//function Image_initConstant
+}
 
 /* initRandom */
 PyObject *

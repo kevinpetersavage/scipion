@@ -123,6 +123,10 @@ Image_setPixel(PyObject *obj, PyObject *args, PyObject *kwargs);
 PyObject *
 Image_initConstant(PyObject *obj, PyObject *args, PyObject *kwargs);
 
+/* initLPFImpulseResponse */
+PyObject *
+Image_initLPFImpulseResponse(PyObject *obj, PyObject *args, PyObject *kwargs);
+
 /* mirrorY */
 PyObject *
 Image_mirrorY(PyObject *obj, PyObject *args, PyObject *kwargs);
