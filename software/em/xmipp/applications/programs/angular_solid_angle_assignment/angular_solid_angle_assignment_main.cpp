@@ -1,6 +1,6 @@
 /***************************************************************************
- * Authors:     AUTHOR_NAME (jlvilas@cnb.csic.es)
  *
+ * Authors:     Jose Luis Vilas (jlvilas@cnb.csic.es)
  *
  * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
  *
@@ -23,46 +23,11 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
-#ifndef INIT_VOLUME_TILT_PAIR_ASSIGNMENT_H_
-#define INIT_VOLUME_TILT_PAIR_ASSIGNMENT_H_
-#define PI 3.14159265
+#include "reconstruction/angular_solid_angle_assignment.h"
 
-
-
-#include <data/xmipp_program.h>
-#include <data/filters.h>
-#include <math.h>
-#include <alglib/src/ap.h>
-//#include <fourier_filter.h>
-
-class ProgInitVolumeTiltPairassignment: public XmippProgram
+int main(int argc, char **argv)
 {
-
-
-public:
-    /** Filenames */
-    FileName fnUntilt, fnTilt, fnDir, fnVol, fnSym, fnmic;
-
-    /** Particle size, sampling rate*/
-    double smprt, alphaU, alphaT, tilt_mic;
-
-    /** Maximum shif for aligning particles*/
-    int maxshift, fnOutVol, pad;
-
-
-public:
-
-    void defineParams();
-
-    void readParams();
-
-    void run();
-
-    void generateProjections(FileName &fnVol, double &smprt);
-
-    void generateFourierStack(const MultidimArray<double> &input_stack,	std::vector< AlignmentTransforms> &galleryTransforms_Test);
-
-    void generateInitialBall(const MetaData &md_u,const MetaData &md_t, MetaData &md_u_assign_iter0, MetaData &md_t_assign_iter0, FileName &fnVol);
-
-};
-#endif
+	ProgSolidAngleAssignment prm;
+    prm.read(argc,argv);
+    return prm.tryRun();
+}

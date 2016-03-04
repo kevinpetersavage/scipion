@@ -78,7 +78,6 @@ void ProgValidationTiltPairs::generateFourierStackTP(const MultidimArray<double>
 
 	for (size_t k=0; k<kmax; ++k)
 	{
-
 		mGalleryProjection.aliasImageInStack(input_stack,k);
 		mGalleryProjection.setXmippOrigin();
 

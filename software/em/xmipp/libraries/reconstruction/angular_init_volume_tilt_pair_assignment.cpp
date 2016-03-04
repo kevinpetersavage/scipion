@@ -41,12 +41,8 @@
 #include <data/projection.h>
 #include <time.h>
 #include "fourier_filter.h"
-//#include <tgmath.h>
 #include "morphology.h"
-
 //#define DEBUG
-//#define DEBUG_CHECK_REF_VOLUME
-//#define DEBUG_SHIFT
 
 
 void ProgInitVolumeTiltPairassignment::readParams()
@@ -215,68 +211,6 @@ void ProgInitVolumeTiltPairassignment::generateInitialBall(const MetaData &md_u,
 	std::cout << cmd << std::endl;
 	system(cmd.c_str());
 	fnVol = fnDir+"/volume_iter_0.vol";
-}
-
-void ProgInitVolumeTiltPairassignment::adaptativeMask(const FileName fnVol, const MetaData &md_angles,
-															MetaData &md_out_filtered, double elongatefactor)
-{
-	Image<double> Img_vol, imparticle, imparticle2;
-	double rot, tilt, psi, HWHM, particle_size, sigma;
-	FileName fnparticle;
-	size_t Xdim, Ydim, Zdim, Ndim;
-	MultidimArray<double> img_filtered_stk, maskDilated;
-	int Xdim_int, Ydim_int;
-	Projection projection;
-
-	Img_vol.read(fnVol);
-
-	md_angles.getValue(MDL_IMAGE, fnparticle ,1);
-	imparticle.read(fnparticle);
-	imparticle.getDimensions(Xdim, Ydim, Zdim, Ndim);
-
-	img_filtered_stk.resize(Xdim, Ydim, Zdim,md_angles.size());
-
-	particle_size = (double) Xdim;
-	Xdim_int = (double) Xdim;
-	Ydim_int = (double) Ydim;
-
-	HWHM =elongatefactor*particle_size;
-
-	sigma = HWHM/(2*sqrt(2*log(2)));
-
-	double Ts = 5;
-	double maxResol = 20;
-	pad = 2;
-	FourierProjector *projectr = new FourierProjector(Img_vol(),pad,Ts/maxResol,BSPLINE3);
-
-
-	FOR_ALL_OBJECTS_IN_METADATA2(md_angles,md_out_filtered)
-	{
-		md_angles.getValue(MDL_ANGLE_ROT, rot ,__iter.objId);
-		md_angles.getValue(MDL_ANGLE_TILT, tilt ,__iter.objId);
-		md_angles.getValue(MDL_ANGLE_PSI, psi ,__iter.objId);
-		md_angles.getValue(MDL_IMAGE, fnparticle ,__iter.objId);
-
-		imparticle.read(fnparticle);
-
-		projectVolume( *projectr, projection, Ydim_int, Xdim_int, rot, tilt, psi, NULL);
-
-		gaussianFilter(projection(), sigma);
-		projection().statisticsAdjust(0,1);
-		projection().setXmippOrigin();
-
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(projection())
-		{
-			dAi(projection(),n) = dAi(projection(), n) >= 0.5 ? 1 : 0;
-			dAi(imparticle2(), n) = dAi(projection(), n)*dAi(imparticle(), n);
-		}
-
-
-
-
-		//dilate2D(projection(), maskDilated,8,0,round(0.1*particle_size));
-	}
-	//md_out_filtered;
 }
 
 

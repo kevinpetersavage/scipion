@@ -23,8 +23,8 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
-#ifndef INIT_VOLUME_TILT_PAIR_ASSIGNMENT_H_
-#define INIT_VOLUME_TILT_PAIR_ASSIGNMENT_H_
+#ifndef SOLID_ANGLE_ASSIGNMENT_H_
+#define SOLID_ANGLE_ASSIGNMENT_H_
 #define PI 3.14159265
 
 
@@ -35,13 +35,13 @@
 #include <alglib/src/ap.h>
 //#include <fourier_filter.h>
 
-class ProgInitVolumeTiltPairassignment: public XmippProgram
+class ProgSolidAngleAssignment: public XmippProgram
 {
 
 
 public:
     /** Filenames */
-    FileName fnUntilt, fnTilt, fnDir, fnVol, fnSym, fnmic;
+    FileName fnparticles, fnDir, fnVol, fnSym, fnmic;
 
     /** Particle size, sampling rate*/
     double smprt, alphaU, alphaT, tilt_mic;
@@ -62,7 +62,7 @@ public:
 
     void generateFourierStack(const MultidimArray<double> &input_stack,	std::vector< AlignmentTransforms> &galleryTransforms_Test);
 
-    void generateInitialBall(const MetaData &md_u,const MetaData &md_t, MetaData &md_u_assign_iter0, MetaData &md_t_assign_iter0, FileName &fnVol);
+    void assignAngles(const MetaData mduntilt_exp, FileName fnun_out);
 
 };
 #endif
