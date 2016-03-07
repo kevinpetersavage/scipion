@@ -47,7 +47,7 @@ class XmippProtAngularInitVolumeTiltPairAssignment(ProtRefine3D):
     
     def __init__(self, *args, **kwargs):
         ProtRefine3D.__init__(self, *args, **kwargs)
-        self.stepsExecutionMode = STEPS_PARALLEL
+        #self.stepsExecutionMode = STEPS_PARALLEL
         
     #--------------------------- DEFINE param functions --------------------------------------------   
     def _defineParams(self, form):
@@ -98,7 +98,7 @@ class XmippProtAngularInitVolumeTiltPairAssignment(ProtRefine3D):
                       help='The images are downsampled in order to speed up the process'
                       'by default = 0.4')
         
-        form.addParallelSection(threads=1, mpi=4)
+        #form.addParallelSection(threads=1, mpi=1)
 
     #--------------------------- INSERT steps functions --------------------------------------------
 
@@ -189,7 +189,8 @@ class XmippProtAngularInitVolumeTiltPairAssignment(ProtRefine3D):
 
         md_u_all.write(path_u_all)
         md_t_all.write(path_t_all)
-        
+
+
     def downsamplingStep(self, images2resize):
        
         params =  '  -i %s ' % images2resize

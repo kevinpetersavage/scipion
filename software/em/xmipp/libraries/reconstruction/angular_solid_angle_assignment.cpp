@@ -311,7 +311,7 @@ void ProgSolidAngleAssignment::run()
 
 
 	//Particles_with same direction, splitting in groups.
-	FOR_ALL_OBJECTS_IN_METADATA()
+
 
 
 
