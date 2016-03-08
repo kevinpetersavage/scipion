@@ -30,23 +30,30 @@
 
 
 #include <data/xmipp_program.h>
+#include <data/filters.h>
 #include <math.h>
 #include <alglib/src/ap.h>
+//#include <fourier_filter.h>
 
-class ProgTiltPairassignment: public XmippProgram
+class ProgAngularTiltPairAssignment: public XmippProgram
 {
-
+public:
+	// Internal members
+	size_t rank, Nprocessors;
 
 public:
     /** Filenames */
-    FileName fnUntilt, fnTilt,  fnDir, fnVol, fnRefVol;
+    FileName fnUntilt, fnTilt, fnDir, fnVol, fnSym, fnmic;
 
     /** Particle size, sampling rate*/
     double smprt, alphaU, alphaT, tilt_mic;
 
     /** Maximum shif for aligning particles*/
-    int maxshift;
+    int maxshift, fnOutVol, pad;
 
+public:
+    /// Empty constructor
+    ProgAngularTiltPairAssignment();
 
 public:
 
@@ -56,7 +63,17 @@ public:
 
     void run();
 
-    void generateProjections(FileName fnVol, double smprt);
+    void generateProjections(FileName &fnVol, double &smprt);
+
+    void generateFourierStack(const MultidimArray<double> &input_stack,	std::vector< AlignmentTransforms> &galleryTransforms_Test);
+
+    void generateInitialBall(const MetaData &md_u,const MetaData &md_t, MetaData &md_u_assign_iter0, MetaData &md_t_assign_iter0, FileName &fnVol);
+
+    /// Gather alignment
+	virtual void gatherAlignment() {}
+
+	/// Synchronize with other processors
+	virtual void synchronize() {}
 
 };
 #endif

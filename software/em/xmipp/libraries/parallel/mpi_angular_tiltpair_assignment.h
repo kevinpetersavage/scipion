@@ -23,5 +23,33 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
-#include "parallel/mpi_angular_tiltpair_assignment.h"
-RUN_XMIPP_PROGRAM(MpiProgAngularTiltPairAssignment)
+#ifndef __MPI_ANGULAR_TILTPAIR_ASSIGNMENT_H
+#define __MPI_ANGULAR_TILTPAIR_ASSIGNMENT_H
+
+#include <reconstruction/angular_tilt_pair_assignment.h>
+#include "parallel/xmipp_mpi.h"
+
+
+/** Significant reconstruction parameters. */
+class MpiProgAngularTiltPairAssignment: public ProgAngularTiltPairAssignment
+{
+public:
+	MpiNode *node;
+public:
+	// Empty constructor
+	MpiProgAngularTiltPairAssignment();
+
+	// Destructor
+	~MpiProgAngularTiltPairAssignment();
+
+	// Redefine how to read the command line
+	void read(int argc, char** argv);
+
+	// Redefine how to synchronize
+	void synchronize();
+
+	// Redefine how to gather the alignment
+    void gatherAlignment();
+};
+//@}
+#endif
