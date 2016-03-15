@@ -350,11 +350,11 @@ void ProgInitVolumeTiltPairassignment::run()
 			ImgUn_exp().setXmippOrigin();
 
 			mdtilt_exp.getValue(MDL_IMAGE, fntilt_exp, __iter2.objId);
-			//std::cout << "He leido la tilt" << std::endl;
+
 			Tilted_filenames[idx] = fntilt_exp;
 			ImgT_exp.read(fntilt_exp);	//Reading image
 			ImgT_exp().setXmippOrigin();
-//			std::cout << "Aqui" << std::endl;
+
 			transformer_T.FourierTransform(ImgT_exp(),FImgT_exp,true);
 
 			double corr1 = 0, bestcorr1 =0;
@@ -398,7 +398,6 @@ void ProgInitVolumeTiltPairassignment::run()
 
 			corr_vec.sort(sortedcorr1);
 
-			//std::cout << "Umbral  = " << round(((double) len_p)*0.8) << std::endl;
 			double threshold = sortedcorr1(round(((double) len_p)*0.8));
 
 			//std::cerr << "threshold = " << threshold << "\n";

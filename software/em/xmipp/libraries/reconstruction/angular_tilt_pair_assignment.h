@@ -41,6 +41,9 @@ public:
 	// Internal members
 	size_t rank, Nprocessors;
 
+	// Auxialiar metadata for storing data
+	MetaData mdPartial_u, mdPartial_t;
+
 public:
     /** Filenames */
     FileName fnUntilt, fnTilt, fnDir, fnVol, fnSym, fnmic;
@@ -69,8 +72,8 @@ public:
 
     void generateInitialBall(const MetaData &md_u,const MetaData &md_t, MetaData &md_u_assign_iter0, MetaData &md_t_assign_iter0, FileName &fnVol);
 
-    /// Gather alignment
-	virtual void gatherAlignment() {}
+//    /// Gather alignment
+//	virtual void gatherAlignment() {}
 
 	/// Synchronize with other processors
 	virtual void synchronize() {}

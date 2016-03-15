@@ -23,5 +23,5 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
-#include "parallel/mpi_angular_tiltpair_assignment.h"
-RUN_XMIPP_PROGRAM(MpiProgAngularTiltPairAssignment)
+#include <reconstruction/angular_tilt_pair_assignment.h>
+RUN_XMIPP_PROGRAM(ProgAngularTiltPairAssignment)

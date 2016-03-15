@@ -48,8 +48,8 @@ public:
 	// Redefine how to synchronize
 	void synchronize();
 
-	// Redefine how to gather the alignment
-    void gatherAlignment();
+//	// Redefine how to gather the alignment
+//    void gatherAlignment();
 };
 //@}
 #endif

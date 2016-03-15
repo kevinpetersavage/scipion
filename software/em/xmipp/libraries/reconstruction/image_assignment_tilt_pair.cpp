@@ -235,7 +235,10 @@ void ProgassignmentTiltPair::run()
 	{
 		thrs = len_t;
 	}
+
+	std::cout << "Aqui" <<std::endl;
 	create_Delaunay_Triangulation( &delaunay_tilt, 1);
+	std::cout << "Aqui" <<std::endl;
 	int tri_number_tilt = get_Number_Real_Faces(delaunay_tilt.dcel);
 	//////////////DATA LOAD AND TRIANGULATIONS FINISHED
 

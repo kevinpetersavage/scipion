@@ -49,61 +49,61 @@ void MpiProgAngularTiltPairAssignment::synchronize()
 	node->barrierWait();
 }
 
-void MpiProgAngularTiltPairAssignment::gatherAlignment()
-{
-	// Share weights and cc volumes
-	MultidimArray<double> aux;
-	if (rank==0)
-		aux.resizeNoCopy(cc);
-	MPI_Reduce(MULTIDIM_ARRAY(weight), MULTIDIM_ARRAY(aux), MULTIDIM_SIZE(weight), MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-	if (rank==0)
-		weight=aux;
-	MPI_Reduce(MULTIDIM_ARRAY(cc), MULTIDIM_ARRAY(aux), MULTIDIM_SIZE(cc), MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-	if (rank==0)
-		cc=aux;
-
-	// Write all metadatas
-	if (rank!=0)
-		for (size_t n=0; n<mdReconstructionPartial.size(); ++n)
-		{
-			FileName fnPartial=formatString("%s/partial_node%03d_%03d.xmd",fnDir.c_str(),(int)rank,(int)n);
-			FileName fnProjectionMatching=formatString("%s/projmatch_node%03d_%03d.xmd",fnDir.c_str(),(int)rank,(int)n);
-
-			if (mdReconstructionPartial[n].size()>0)
-				mdReconstructionPartial[n].write(fnPartial);
-			if (mdReconstructionProjectionMatching[n].size()>0)
-				mdReconstructionProjectionMatching[n].write(fnProjectionMatching);
-		}
-	synchronize();
-
-	// Now the master takes all of them
-	if (rank==0)
-	{
-		MetaData MDAux;
-		for (size_t otherRank=1; otherRank<Nprocessors; ++otherRank)
-		{
-			for (size_t n=0; n<mdReconstructionPartial.size(); ++n)
-			{
-				FileName fnPartial=formatString("%s/partial_node%03d_%03d.xmd",fnDir.c_str(),(int)otherRank,(int)n);
-				FileName fnProjectionMatching=formatString("%s/projmatch_node%03d_%03d.xmd",fnDir.c_str(),(int)otherRank,(int)n);
-
-				if (fnPartial.exists())
-				{
-					MDAux.read(fnPartial);
-					mdReconstructionPartial[n].unionAll(MDAux);
-					deleteFile(fnPartial);
-				}
-				if (fnProjectionMatching.exists())
-				{
-					MDAux.read(fnProjectionMatching);
-					mdReconstructionProjectionMatching[n].unionAll(MDAux);
-					deleteFile(fnProjectionMatching);
-				}
-			}
-		}
-	}
-
-	// std::cout << "synchronize" << std::endl;
-	synchronize();
-
-}
+//void MpiProgAngularTiltPairAssignment::gatherAlignment()
+//{
+//	// Share weights and cc volumes
+//	MultidimArray<double> aux;
+//	if (rank==0)
+//		aux.resizeNoCopy(cc);
+//	MPI_Reduce(MULTIDIM_ARRAY(weight), MULTIDIM_ARRAY(aux), MULTIDIM_SIZE(weight), MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+//	if (rank==0)
+//		weight=aux;
+//	MPI_Reduce(MULTIDIM_ARRAY(cc), MULTIDIM_ARRAY(aux), MULTIDIM_SIZE(cc), MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+//	if (rank==0)
+//		cc=aux;
+//
+//	// Write all metadatas
+//	if (rank!=0)
+//		for (size_t n=0; n<mdReconstructionPartial.size(); ++n)
+//		{
+//			FileName fnPartial=formatString("%s/partial_node%03d_%03d.xmd",fnDir.c_str(),(int)rank,(int)n);
+//			FileName fnProjectionMatching=formatString("%s/projmatch_node%03d_%03d.xmd",fnDir.c_str(),(int)rank,(int)n);
+//
+//			if (mdReconstructionPartial[n].size()>0)
+//				mdReconstructionPartial[n].write(fnPartial);
+//			if (mdReconstructionProjectionMatching[n].size()>0)
+//				mdReconstructionProjectionMatching[n].write(fnProjectionMatching);
+//		}
+//	synchronize();
+//
+//	// Now the master takes all of them
+//	if (rank==0)
+//	{
+//		MetaData MDAux;
+//		for (size_t otherRank=1; otherRank<Nprocessors; ++otherRank)
+//		{
+//			for (size_t n=0; n<mdReconstructionPartial.size(); ++n)
+//			{
+//				FileName fnPartial=formatString("%s/partial_node%03d_%03d.xmd",fnDir.c_str(),(int)otherRank,(int)n);
+//				FileName fnProjectionMatching=formatString("%s/projmatch_node%03d_%03d.xmd",fnDir.c_str(),(int)otherRank,(int)n);
+//
+//				if (fnPartial.exists())
+//				{
+//					MDAux.read(fnPartial);
+//					mdReconstructionPartial[n].unionAll(MDAux);
+//					deleteFile(fnPartial);
+//				}
+//				if (fnProjectionMatching.exists())
+//				{
+//					MDAux.read(fnProjectionMatching);
+//					mdReconstructionProjectionMatching[n].unionAll(MDAux);
+//					deleteFile(fnProjectionMatching);
+//				}
+//			}
+//		}
+//	}
+//
+//	// std::cout << "synchronize" << std::endl;
+//	synchronize();
+//
+//}
