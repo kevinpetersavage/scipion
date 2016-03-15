@@ -38,7 +38,7 @@ import math
 class XmippProtDirectionalClasses(ProtAnalysis3D):
     """    
     Analyze 2D classes as assigned to the different directions
-    """
+    """ 
 
     _label = 'directional_classes'
     
