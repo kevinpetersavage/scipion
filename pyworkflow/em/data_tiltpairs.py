@@ -113,11 +113,14 @@ class CoordinatesTiltPair(TiltPairSet):
     
     def __init__(self, **kwargs):
         TiltPairSet.__init__(self, **kwargs)
-        self._angles = SetOfAngles()
+        self._angles = None
         self._micsPair = Pointer()
         
     def getAngles(self):
         return self._angles
+    
+    def getBoxSize(self):
+        return self.getUntilted().getBoxSize()
     
     def getMicsPair(self):
         return self._micsPair.get()
@@ -140,7 +143,8 @@ class CoordinatesTiltPair(TiltPairSet):
 
     def close(self):
         TiltPairSet.close(self)
-        self.getAngles().close()
+        if self.getAngles():
+            self.getAngles().close()
 
          
 class Angles(EMObject):
@@ -165,9 +169,6 @@ class SetOfAngles(EMSet):
     """ Represents a set of Images """
     ITEM_TYPE = Angles
     
-    def __init__(self, **args):
-        EMSet.__init__(self, **args)
-        
     def _loadClassesDict(self):
         return globals()  
     
