@@ -128,6 +128,8 @@ void ProgImageTiltPairHeterogeneity::run()
 
 	std::random_shuffle ( randomvector.begin(), randomvector.end());
 
+	//Instead of performing a random assignment, split in three orthogonal directions and create 2^3 volumes
+
 	std::cout << "len_all = " << len_all << std::endl;
 	threshold_split = floor(len_all/2);
 	for (size_t i=0; i<len_all; ++i)
@@ -151,10 +153,6 @@ void ProgImageTiltPairHeterogeneity::run()
 
 	md_all_particles_set1.write(fn_md_all_particles_set1);
 	md_all_particles_set2.write(fn_md_all_particles_set2);
-
-
-
-
 }
 
 
