@@ -252,8 +252,10 @@ void ProgAngularTiltPairAssignment::run()
 	//std::cout << "Metadata tilt = " << mdtilt_exp << std::endl;
 	if (fnVol =="")
 	{
+		if (rank == 0)
 		generateInitialBall(mduntilt_exp, mdtilt_exp, md_u_assign_iter0, md_t_assign_iter0, fnVol);
 	}
+	synchronize();
 
 	//Common parameters
 
