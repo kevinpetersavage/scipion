@@ -34,6 +34,7 @@ from pyworkflow.em.protocol.protocol_3d import ProtRefine3D
 from pyworkflow.em.metadata.constants import (MDL_ANGLE_Y, MDL_IMAGE, MDL_ANGLE_Y2, MDL_ANGLE_TILT, MDL_PARTICLE_ID, 
                                               MD_APPEND, MDL_MICROGRAPH_ID)
 from pyworkflow.em.data import Volume
+from shutil import copyfile
 
 
 
@@ -114,18 +115,24 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
         fnTilt = self._getExtraPath() + '/all_tilted_particles_input.xmd'
         fnmic = self._getExtraPath() + '/Mic_angles.xmd'
          
-#         self._insertFunctionStep('downsamplingStep', fnUntilt)
-#         self._insertFunctionStep('downsamplingStep', fnTilt)
-        
+        maskId = self._insertFunctionStep('mask2InputParticles', fnUntilt, fnTilt, prerequisites=[convertId])
+         
+         
         for k in range(1, int(self.iterations.get())+1):
-            #transform mask threshold 
-            #self._insertFunctionStep('maskStep', fnUntilt, fnTilt, fnmic, k, prerequisites=[convertId])
-            self._insertFunctionStep('angularTiltAssignmentStep', fnUntilt, fnTilt, fnmic, k, prerequisites=[convertId])
+             
+            self._insertFunctionStep('angularTiltAssignmentStep', fnUntilt, fnTilt, fnmic, k, prerequisites=[maskId])
             self._insertFunctionStep('ReconstructFourierStep', k)
-
-        
+ 
+         
         self._insertFunctionStep('createOutputStep')
-#                 
+# #                 
+    def mask2InputParticles(self, fnUntilt, fnTilt):
+        xdim = self.tilpairparticles.get().getUntilted().getDimensions()[0]
+        maskArgs = "-i %s --mask circular %d -v 0" % (fnUntilt, -xdim/2)
+        self.runJob('xmipp_transform_mask', maskArgs, numberOfMpi=1)
+        maskArgs = "-i %s --mask circular %d -v 0" % (fnTilt, -xdim/2)
+        self.runJob('xmipp_transform_mask', maskArgs, numberOfMpi=1)
+
 
     def convertInputStep(self):
         """ Read the input metadatata.
@@ -191,28 +198,34 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
 
         md_u_all.write(path_u_all)
         md_t_all.write(path_t_all)
+        
 
 
-    def downsamplingStep(self, images2resize):
-       
-        params =  '  -i %s ' % images2resize
-        params += '  --factor %f ' % self.downsamplingfactor.get()
-        params += '  --oroot %s ' %self._getExtraPath()
 
-        self.runJob('xmipp_image_resize', params)
+#     def downsamplingStep(self, images2resize):
+#        
+#         params =  '  -i %s ' % images2resize
+#         params += '  --factor %f ' % self.downsamplingfactor.get()
+#         params += '  --oroot %s ' %self._getExtraPath()
+# 
+#         self.runJob('xmipp_image_resize', params)
 
-    def maskStep(self):
-        params =  ' -i %s' % 'reference.vol'
-        params += ' -o %s' % 'output_volume.vol'
-        params += ' --mask circular -%f' % 5.0
-
-        self.runJob('xmipp_transform_mask', params)
-    
+   
     def angularTiltAssignmentStep(self, fnUntilt, fnTilt, fnmic, iter_num):
         
+
         if iter_num is 1:
             if self.thereisRefVolume.get() is True:
                 volume_init = self.initvolume.get().getFileName()
+                print '-------------------------'
+                print volume_init
+                print '-------------------------'
+                copyfile(volume_init,self._getExtraPath('init_vol.vol'))
+                volume_init = self._getExtraPath('init_vol.vol')
+                print volume_init
+                xdim = self.tilpairparticles.get().getUntilted().getDimensions()[0]
+                maskArgs = "-i %s --mask circular %d -v 0" % (volume_init, -xdim/2)
+                self.runJob('xmipp_transform_mask', maskArgs, numberOfMpi=1)
             else:
                 volume_init = ''
         else:
@@ -241,6 +254,10 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
         params += '  --padding %f' %self.padfactor.get()
         
         self.runJob('xmipp_reconstruct_fourier', params);
+        
+        xdim = self.tilpairparticles.get().getUntilted().getDimensions()[0]
+        maskArgs = "-i %s --mask circular %d -v 0" % (self.getIterVolume(iterNumber), -xdim/2)
+        self.runJob('xmipp_transform_mask', maskArgs, numberOfMpi=1)
 
     
     def createOutputStep(self):
