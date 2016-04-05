@@ -67,7 +67,11 @@ public:
 
     void assignAngles(const MetaData mduntilt_exp, FileName fnun_out);
 
-    /// Execute de program
+    void validate(MetaData &md_u, MetaData &md_t, MetaData &md_out, MetaData &md_validation);
+
+    void powerIterationMethod(const Matrix2D<double> M);
+
+    /// Execute the program
     void run();
 
 

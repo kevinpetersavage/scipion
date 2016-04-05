@@ -24,8 +24,10 @@
  ***************************************************************************/
 #include "validation_tilt_pairs.h"
 #include <data/metadata.h>
+#include <data/matrix2d.h>
 #include <data/metadata_extension.h>
 #include <complex>
+//#include <external/alglib/src/linalg.h>
 //#define DEBUG
 //#define DEBUG1
 
@@ -37,13 +39,16 @@
 void ProgValidationTiltPairs::defineParams()
 {
     //Usage
-    addUsageLine("Takes two coordinates sets and defines the coordinate transformation between them");
+    addUsageLine("Takes two coordinates sets and determines the transformation between them");
 	addUsageLine("First set defines the untilted coordinates, second set defines the tilted coordinates");
 	addParamsLine(" --tilt <md_file=\"\"> : Metadata with angular assignment for the tilted images");
+	addParamsLine(" --untilt <md_file=\"\"> : Metadata with angular assignment for the untilted images");
+
 	addParamsLine(" --untilt2assign <md_file=\"\"> : Metadata with untilted particles to be angular assigned");
 	addParamsLine(" --tilt2assign <md_file=\"\"> : Metadata with tilted particles to be angular assigned");
-	addParamsLine(" --untilt <md_file=\"\"> : Metadata with angular assignment for the untilted images");
+
 	addParamsLine(" -o <md_file=\"\"> : Metadata with matrix transformation");
+
 	addParamsLine("  [--vol <img_file=\"\">]    : Input reference volume");
 	addParamsLine("  [--angular_sampling <s=5>]   : Angular sampling rate in degrees. This sampling "
 			"represents the accuracy for assigning directions");
@@ -269,109 +274,257 @@ void ProgValidationTiltPairs::assignAngles(const MetaData mduntilt_exp, FileName
 	mduntilt_output.write(fnOut+"/"+fnun_out);
 }
 
+void ProgValidationTiltPairs::validate(MetaData &md_u, MetaData &md_t, MetaData &md_out, MetaData &md_validation)
+{
+	size_t len_u, len_t;
+
+	len_u = md_u.size();  //Metadata length
+	len_t = md_t.size();
+
+	if (len_u!=len_t)
+	{
+		std::cerr << "ERROR: Mismatch dimensions: Number of untilted and tilted particles is not the same" << std::endl;
+		exit(0);
+	}
+
+	MetaData md_u_sorted, md_t_sorted;
+	md_u_sorted.sort(md_u, MDL_ITEM_ID, true);
+	md_t_sorted.sort(md_t, MDL_ITEM_ID, true);
+
+	size_t elementId_u, elementId_t, objId_out;
+	double rot_u, rot_t, tilt_u, tilt_t, psi_u, psi_t;
+	Matrix2D<double> ZYZ_u, ZYZ_t, ZYZ_angles, B_aux, P_mat;
+	Matrix1D<double> Eu_dir, D_mat;
+
+
+	ZYZ_u.initZeros(4,4);
+	ZYZ_t.initZeros(4,4);
+	ZYZ_angles.initZeros(4,4);
+
+	double alpha, beta, gamma, tr, rotated_angle;
+
+	FOR_ALL_OBJECTS_IN_METADATA2(md_u_sorted, md_t_sorted)
+	{
+		md_u_sorted.getValue(MDL_ITEM_ID, elementId_u ,__iter.objId);
+		md_u_sorted.getValue(MDL_ANGLE_ROT, rot_u ,__iter.objId);
+		md_u_sorted.getValue(MDL_ANGLE_TILT, tilt_u,__iter.objId);
+		md_u_sorted.getValue(MDL_ANGLE_PSI, psi_u,__iter.objId);
+
+		md_t_sorted.getValue(MDL_ITEM_ID, elementId_t,__iter2.objId);
+		md_t_sorted.getValue(MDL_ANGLE_ROT, rot_t,__iter2.objId);
+		md_t_sorted.getValue(MDL_ANGLE_TILT, tilt_t,__iter2.objId);
+		md_t_sorted.getValue(MDL_ANGLE_PSI, psi_t,__iter2.objId);
+
+		Euler_angles2matrix(rot_u, tilt_u, psi_u, ZYZ_u);
+		Euler_angles2matrix(rot_t, tilt_t, psi_t, ZYZ_t);
+
+		ZYZ_angles = ZYZ_t* (ZYZ_u.inv());
+
+		#ifdef DEBUG
+		std::cout << elementId_u << "  " << elementId_t << std::endl;
+		std::cout << "rot_u  " << rot_u << std::endl;
+		std::cout << "tilt_u " << tilt_u << std::endl;
+		std::cout << "psi_u  " << psi_u << std::endl;
+		std::cout << "--------------------" << std::endl;
+		std::cout << "rot_t  " << rot_t << std::endl;
+		std::cout << "tilt_t " << tilt_t << std::endl;
+		std::cout << "psi_t  " << psi_t << std::endl;
+		std::cout << "--------------------" << std::endl;
+		std::cout << "ZYZ_u = " << ZYZ_u << std::endl;
+		std::cout << "ZYZ_t = " << ZYZ_t << std::endl;
+		std::cout << "ZYZ_matrix = " << ZYZ_angles << std::endl;
+		#endif
+
+		Euler_matrix2angles(ZYZ_angles, alpha, beta, gamma);
+		alpha *= -1;
+
+		if (beta>90)
+		{
+			beta = beta - 90;
+			alpha = alpha - 180;
+			gamma = gamma + 180;
+		}
+		tr = MAT_ELEM(ZYZ_angles, 0,0) + MAT_ELEM(ZYZ_angles, 1,1) + MAT_ELEM(ZYZ_angles, 2,2) + MAT_ELEM(ZYZ_angles, 3,3);
+		rotated_angle = acos((tr-1)*0.5)*180/PI;
+
+		B_aux.initIdentity(4);
+
+		generalizedEigs(ZYZ_angles, B_aux, D_mat, P_mat);
+
+		std::cout << "Autovalores = " << D_mat << std::endl;
+		std::cout << "Autovectores = " << D_mat << std::endl;
+
+//	    if isreal(eig_angles(1,1))
+//	        control(k)=1;
+//	        ejevector(:,k) = eig_vectors(:,1);
+//	        eje_ang_x(k) = acosd(ex*eig_vectors(:,1));
+//	        eje_ang_y(k) = acosd(ey*eig_vectors(:,1));
+//	        eje_ang_z(k) = acosd(ez*eig_vectors(:,1));
+//	    else
+//	        if isreal(eig_angles(2,2))
+//	            control(k)=2;
+//	            ejevector(:,k) = eig_vectors(:,2);
+//	            eje_ang_x(k) = acosd(ex*eig_vectors(:,2));
+//	            eje_ang_y(k) = acosd(ey*eig_vectors(:,2));
+//	            eje_ang_z(k) = acosd(ez*eig_vectors(:,2));
+//	        else
+//	            if isreal(eig_angles(3,3))
+//	                control(k)=3;
+//	                ejevector(:,k) = eig_vectors(:,3);
+//	                eje_ang_x(k) = acosd(ex*eig_vectors(:,3));
+//	                eje_ang_y(k) = acosd(ey*eig_vectors(:,3));
+//	                eje_ang_z(k) = acosd(ez*eig_vectors(:,3));
+//	            else
+//	                count_error = count_error + 1;
+//	            end
+//	        end
+//	    end
+
+
+
+		#ifdef DEBUG
+		std::cout << "alpha = " << alpha << std::endl;
+		std::cout << "betaa = " << beta << std::endl;
+		std::cout << "gamma = " << gamma << std::endl;
+		std::cout << "        " << std::endl;
+		std::cout << "        " << std::endl;
+		#endif
+
+		objId_out = md_out.addObject();
+		md_out.setValue(MDL_ITEM_ID, elementId_u,objId_out);
+		md_out.setValue(MDL_ANGLE_ROT, alpha, objId_out);
+		md_out.setValue(MDL_ANGLE_TILT, beta, objId_out);
+		md_out.setValue(MDL_ANGLE_PSI, gamma, objId_out);
+		/*
+		objId_out = md_out.addObject();
+		md_out.setValue(MDL_ITEM_ID, elementId_u,objId_out);
+		md_out.setValue(MDL_ROTAION_ANGLE, alpha, objId_out);
+		md_out.setValue(MDL_TILT_AXIS_X, alpha, objId_out);
+		md_out.setValue(MDL_TILT_AXIS_X, beta, objId_out);
+		md_out.setValue(MDL_TILT_AXIS_X, gamma, objId_out);
+		*/
+	}
+	md_out.write((String)"particles@"+fnOut+"_angular_assignment"+".xmd");
+	md_validation.write((String)"particles@"+fnOut+"_angular_validation"+".xmd");
+}
+
+
+void ProgValidationTiltPairs::powerIterationMethod(const Matrix2D<double> M)
+{
+	Matrix1D <double> seed, c;
+    double d=0,temp;
+    int i,j;
+
+    size_t n =M.mdimx;
+    //x is the input vector
+
+    c.initZeros(n);
+    seed.initZeros(n);
+
+    VEC_ELEM(seed,0) = 0;
+    VEC_ELEM(seed,1) = 1;
+    VEC_ELEM(seed,2) = 0;
+
+    do
+    {
+        for(i=0;i<n;i++)
+        {
+        	VEC_ELEM(c,i)=0;
+            for(j=0;j<n;j++)
+            	VEC_ELEM(c,i)+=MAT_ELEM(M,i,j)*VEC_ELEM(seed,j);
+        }
+        for(i=0;i<n;i++)
+        	VEC_ELEM(seed,i)=VEC_ELEM(c,i);
+
+        temp=d;
+        d=0;
+
+        for(i=0;i<n;i++)
+        {
+            if(fabs(VEC_ELEM(seed,i))>fabs(d))
+                d=VEC_ELEM(seed,i);
+        }
+        for(i=0;i<n;i++)
+        	VEC_ELEM(seed,i)/=d;
+
+    }while(fabs(d-temp)>0.00001);
+
+    std::cout<<"Eigen value is : "<< d <<std::endl;
+
+    std::cout<<"Eigenvector is: \n";
+    for(i=0;i<n;i++)
+    	std::cout<<VEC_ELEM(seed,i)<<std::endl;
+
+}
+
+
 
 void ProgValidationTiltPairs::run()
 {
 	std::cout << "Starting..." << std::endl;
+	MetaData md_u, md_t, md_mic, md_out, md_val;;
 
-	MetaData mduntilt_exp, mdtilt_exp;
-	mduntilt_exp.read(fnuntilt2assign);
-	mdtilt_exp.read(fntilt2assign);
+	Matrix2D<double> M;
+	M.initZeros(3,3);
 
-	std::cout << "Performing Untilted Assigning" << std::endl;
-	assignAngles(mduntilt_exp, "untilted_assigned.xmd");
+	MAT_ELEM(M,0,0) = 0.6056;
+	MAT_ELEM(M,0,1) = -0.3741;
+	MAT_ELEM(M,0,2) = -0.7023;
+	MAT_ELEM(M,1,0) = -0.3110;
+	MAT_ELEM(M,1,1) = 0.7012;
+	MAT_ELEM(M,1,2) = -0.6416;
+	MAT_ELEM(M,2,0) = 0.7325;
+	MAT_ELEM(M,2,1) = 0.6070;
+	MAT_ELEM(M,2,2) = 0.3083;
 
-	std::cout << "Performing Tilted Assigning" << std::endl;
-	assignAngles(mdtilt_exp, "tilted_assigned.xmd");
+	powerIterationMethod(M);
 
 
-
-
-
-
-
-//	std::cout << "Starting..." << std::endl;
-//
-//	//Reading metadata with untilted and tilted angles
-//	size_t len_u, len_t;
-//	MetaData md_u, md_t, md_mic;
-//
-//	md_u.read(fnuntilt);
-//	md_t.read(fntilt);
-//
-//	len_u = md_u.size();
-//	len_t = md_t.size();
-//
-//	if (len_u!=len_t)
+//	if (fnuntilt2assign != "" &&  fntilt2assign != "")
 //	{
-//		std::cerr << "ERROR: Mismatch dimensions: Number of untilted and tilted particles is not the same" << std::endl;
-//		exit(0);
+//		MetaData mduntilt_exp, mdtilt_exp;
+//		mduntilt_exp.read(fnuntilt2assign);
+//		mdtilt_exp.read(fntilt2assign);
+//
+//		std::cout << "Performing Untilted Assigning" << std::endl;
+//		assignAngles(mduntilt_exp, "untilted_assigned.xmd");
+//
+//		std::cout << "Performing Tilted Assigning" << std::endl;
+//		assignAngles(mdtilt_exp, "tilted_assigned.xmd");
+//
+//		md_u.read(fnuntilt);
+//		md_t.read(fntilt);
+//		validate(md_u, md_t, md_out, md_val);
+//
+////		rmatrixevd(const real_2d_array &a, const ae_int_t n, const ae_int_t vneeded, real_1d_array &wr, real_1d_array &wi, ...
+////				real_2d_array &vl, real_2d_array &vr);
+//
+////		FOR_ALL_OBJECTS_IN_METADATA(md_out)
+////		{
+////			md_u_sorted.getValue(MDL_ITEM_ID, elementId_u ,__iter.objId);
+////			md_u_sorted.getValue(MDL_ANGLE_ROT, rot_u ,__iter.objId);
+////			md_u_sorted.getValue(MDL_ANGLE_TILT, tilt_u,__iter.objId);
+////			md_u_sorted.getValue(MDL_ANGLE_PSI, psi_u,__iter.objId);
+////
+////			md_t_sorted.getValue(MDL_ITEM_ID, elementId_t,__iter2.objId);
+////			md_t_sorted.getValue(MDL_ANGLE_ROT, rot_t,__iter2.objId);
+////			md_t_sorted.getValue(MDL_ANGLE_TILT, tilt_t,__iter2.objId);
+////			md_t_sorted.getValue(MDL_ANGLE_PSI, psi_t,__iter2.objId);
+////		}
 //	}
-//
-//	MetaData md_u_sorted, md_t_sorted, md_out;
-//	md_u_sorted.sort(md_u, MDL_ITEM_ID, true);
-//	md_t_sorted.sort(md_t, MDL_ITEM_ID, true);
-//
-//	size_t elementId_u, elementId_t, objId_out;
-//	double rot_u, rot_t, tilt_u, tilt_t, psi_u, psi_t;
-//	Matrix2D<double> ZYZ_u, ZYZ_t, ZYZ_angles;
-//	Matrix1D<double> Eu_dir;
-//
-//	ZYZ_u.initZeros(4,4);
-//	ZYZ_t.initZeros(4,4);
-//	ZYZ_angles.initZeros(4,4);
-//
-//	double alpha, beta, gamma;
-//
-//	FOR_ALL_OBJECTS_IN_METADATA2(md_u_sorted, md_t_sorted)
+//	else
 //	{
-//
-//		md_u_sorted.getValue(MDL_ITEM_ID, elementId_u ,__iter.objId);
-//		md_u_sorted.getValue(MDL_ANGLE_ROT, rot_u ,__iter.objId);
-//		md_u_sorted.getValue(MDL_ANGLE_TILT, tilt_u,__iter.objId);
-//		md_u_sorted.getValue(MDL_ANGLE_PSI, psi_u,__iter.objId);
-//
-//		md_t_sorted.getValue(MDL_ITEM_ID, elementId_t,__iter2.objId);
-//		md_t_sorted.getValue(MDL_ANGLE_ROT, rot_t,__iter2.objId);
-//		md_t_sorted.getValue(MDL_ANGLE_TILT, tilt_t,__iter2.objId);
-//		md_t_sorted.getValue(MDL_ANGLE_PSI, psi_t,__iter2.objId);
-//
-//		Euler_angles2matrix(rot_u, tilt_u, psi_u, ZYZ_u);
-//		Euler_angles2matrix(rot_t, tilt_t, psi_t, ZYZ_t);
-//
-//		ZYZ_angles = ZYZ_t* (ZYZ_u.inv());
-//
-//		std::cout << elementId_u << "  " << elementId_t << std::endl;
-//		std::cout << "rot_u  " << rot_u << std::endl;
-//		std::cout << "tilt_u " << tilt_u << std::endl;
-//		std::cout << "psi_u  " << psi_u << std::endl;
-//		std::cout << "--------------------" << std::endl;
-//		std::cout << "rot_t  " << rot_t << std::endl;
-//		std::cout << "tilt_t " << tilt_t << std::endl;
-//		std::cout << "psi_t  " << psi_t << std::endl;
-//		std::cout << "--------------------" << std::endl;
-//		std::cout << "ZYZ_u = " << ZYZ_u << std::endl;
-//		std::cout << "ZYZ_t = " << ZYZ_t << std::endl;
-//		std::cout << "ZYZ_matrix = " << ZYZ_angles << std::endl;
+//		md_u.read(fnuntilt);
+//		md_t.read(fntilt);
 //
 //
-//		Euler_matrix2angles(ZYZ_angles, alpha, beta, gamma);
-//		alpha *= -1;
-//		std::cout << "alpha = " << alpha << std::endl;
-//		std::cout << "betaa = " << beta << std::endl;
-//		std::cout << "gamma = " << gamma << std::endl;
-//		std::cout << "        " << std::endl;
-//		std::cout << "        " << std::endl;
-//
-//		objId_out = md_out.addObject();
-//		md_out.setValue(MDL_ITEM_ID, elementId_u,objId_out);
-//		md_out.setValue(MDL_ANGLE_ROT, alpha, objId_out);
-//		md_out.setValue(MDL_ANGLE_TILT, beta, objId_out);
-//		md_out.setValue(MDL_ANGLE_PSI, gamma, objId_out);
-//
+//		validate(md_u, md_t, md_out,md_val);
 //	}
-//
-//	md_out.write((String)"particles@"+fnOut+"_angular_assignment"+".xmd");
+
+
+
+
+
 
 }
 
