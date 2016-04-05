@@ -347,6 +347,7 @@ enum MDLabel
     MDL_RESOLUTION_LOG_STRUCTURE_FACTOR, ///<Logarithm of the structure factor
     MDL_RESOLUTION_SSNR, ///<Fourier shell correlation (double)
     MDL_RESOLUTION_STRUCTURE_FACTOR, ///<Structure factor
+    MDL_ROTATION_ANGLE, /// Rotation angle around the tilt axis (double)
 
     MDL_SAMPLINGRATE, ///< sampling rate in A/pixel (double)
     MDL_SAMPLINGRATE_ORIGINAL, ///< original sampling rate in A/pixel (double)
@@ -375,6 +376,9 @@ enum MDLabel
     MDL_SUM, ///< Sum of elements of a given type (double) [this is a genereic type do not use to transfer information to another program]
     MDL_SUMWEIGHT, ///< Sum of all weights in ML model
     MDL_SYMNO, ///< Symmetry number for a projection (used in ART)
+    MDL_TILT_AXIS_X, //Component x of the tilt axis. Tilt axis is defined as the rotation axis in tilt pairs. (double)
+    MDL_TILT_AXIS_Y, //Component y of the tilt axis. (double)
+    MDL_TILT_AXIS_Z, //Component z of the tilt axis. (double)
     MDL_TOMOGRAM_VOLUME, ///< Name for the reconstructed tomogram volume (std::string)
     MDL_TOMOGRAMMD, ///< Name for a Metadata file (std::string)
     MDL_TRANSFORM_MATRIX, ///< transformation matrix in numpy string format or space separated (std::string)
@@ -1677,6 +1681,7 @@ private:
         MDL::addLabel(MDL_RESOLUTION_LOG_STRUCTURE_FACTOR, LABEL_DOUBLE, "resolutionLogStructure");
         MDL::addLabel(MDL_RESOLUTION_STRUCTURE_FACTOR, LABEL_DOUBLE, "resolutionStructure");
         MDL::addLabel(MDL_RESOLUTION_SSNR, LABEL_DOUBLE, "resolutionSSNR");
+        MDL::addLabel(MDL_ROTATION_ANGLE, LABEL_DOUBLE, "rotationAngle");
 
         MDL::addLabelAlias(MDL_RESOLUTION_DPR, "DPR");
         MDL::addLabelAlias(MDL_RESOLUTION_ERRORL2, "Error_l2");
@@ -1724,6 +1729,9 @@ private:
         MDL::addLabel(MDL_SUM, LABEL_DOUBLE, "sum");
         MDL::addLabel(MDL_SUMWEIGHT, LABEL_DOUBLE, "sumWeight");
         MDL::addLabel(MDL_SYMNO, LABEL_INT, "symNo");
+        MDL::addLabel(MDL_TILT_AXIS_X, LABEL_DOUBLE, "tiltAxisX");
+        MDL::addLabel(MDL_TILT_AXIS_Y, LABEL_DOUBLE, "tiltAxisY");
+        MDL::addLabel(MDL_TILT_AXIS_Z, LABEL_DOUBLE, "tiltAxisZ");
 
         MDL::addLabel(MDL_TOMOGRAM_VOLUME, LABEL_STRING, "tomogramVolume", TAGLABEL_IMAGE);
         MDL::addLabel(MDL_TOMOGRAMMD, LABEL_STRING, "tomogramMetadata", TAGLABEL_METADATA);
