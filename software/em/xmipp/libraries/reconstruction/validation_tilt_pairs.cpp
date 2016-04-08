@@ -25,6 +25,7 @@
 #include "validation_tilt_pairs.h"
 #include <data/metadata.h>
 #include <data/matrix2d.h>
+#include <data/matrix1d.h>
 #include <data/metadata_extension.h>
 #include <complex>
 //#include <external/alglib/src/linalg.h>
@@ -276,7 +277,13 @@ void ProgValidationTiltPairs::assignAngles(const MetaData mduntilt_exp, FileName
 
 void ProgValidationTiltPairs::validate(MetaData &md_u, MetaData &md_t, MetaData &md_out, MetaData &md_validation)
 {
-	size_t len_u, len_t;
+	MetaData md_u_sorted, md_t_sorted;
+	size_t len_u, len_t, elementId_u, elementId_t, objId_out, objId_out2;
+	double rot_u, rot_t, tilt_u, tilt_t, psi_u, psi_t, aux_axis_y, alpha, beta, gamma, tr, rotated_angle, eigenvalueapprox;
+	Matrix2D<double> ZYZ_u, ZYZ_t, ZYZ_angles, B_aux, P_mat;
+	Matrix1D<double> Eu_dir, eigenvector, angs_axis, axis;
+
+	axis.initZeros(3);
 
 	len_u = md_u.size();  //Metadata length
 	len_t = md_t.size();
@@ -287,30 +294,23 @@ void ProgValidationTiltPairs::validate(MetaData &md_u, MetaData &md_t, MetaData 
 		exit(0);
 	}
 
-	MetaData md_u_sorted, md_t_sorted;
-	md_u_sorted.sort(md_u, MDL_ITEM_ID, true);
-	md_t_sorted.sort(md_t, MDL_ITEM_ID, true);
+	md_u_sorted.sort(md_u, MDL_PARTICLE_ID, true);
+	md_t_sorted.sort(md_t, MDL_PARTICLE_ID, true);
 
-	size_t elementId_u, elementId_t, objId_out;
-	double rot_u, rot_t, tilt_u, tilt_t, psi_u, psi_t;
-	Matrix2D<double> ZYZ_u, ZYZ_t, ZYZ_angles, B_aux, P_mat;
-	Matrix1D<double> Eu_dir, D_mat;
-
+	angs_axis.initZeros(3);
 
 	ZYZ_u.initZeros(4,4);
 	ZYZ_t.initZeros(4,4);
 	ZYZ_angles.initZeros(4,4);
 
-	double alpha, beta, gamma, tr, rotated_angle;
-
 	FOR_ALL_OBJECTS_IN_METADATA2(md_u_sorted, md_t_sorted)
 	{
-		md_u_sorted.getValue(MDL_ITEM_ID, elementId_u ,__iter.objId);
+		md_u_sorted.getValue(MDL_PARTICLE_ID, elementId_u ,__iter.objId);
 		md_u_sorted.getValue(MDL_ANGLE_ROT, rot_u ,__iter.objId);
 		md_u_sorted.getValue(MDL_ANGLE_TILT, tilt_u,__iter.objId);
 		md_u_sorted.getValue(MDL_ANGLE_PSI, psi_u,__iter.objId);
 
-		md_t_sorted.getValue(MDL_ITEM_ID, elementId_t,__iter2.objId);
+		md_t_sorted.getValue(MDL_PARTICLE_ID, elementId_t,__iter2.objId);
 		md_t_sorted.getValue(MDL_ANGLE_ROT, rot_t,__iter2.objId);
 		md_t_sorted.getValue(MDL_ANGLE_TILT, tilt_t,__iter2.objId);
 		md_t_sorted.getValue(MDL_ANGLE_PSI, psi_t,__iter2.objId);
@@ -349,38 +349,19 @@ void ProgValidationTiltPairs::validate(MetaData &md_u, MetaData &md_t, MetaData 
 
 		B_aux.initIdentity(4);
 
-		generalizedEigs(ZYZ_angles, B_aux, D_mat, P_mat);
+		eigenvalueapprox = 0.99;
 
-		std::cout << "Autovalores = " << D_mat << std::endl;
-		std::cout << "Autovectores = " << D_mat << std::endl;
+		powerIterationMethod(ZYZ_angles, eigenvector, eigenvalueapprox);
 
-//	    if isreal(eig_angles(1,1))
-//	        control(k)=1;
-//	        ejevector(:,k) = eig_vectors(:,1);
-//	        eje_ang_x(k) = acosd(ex*eig_vectors(:,1));
-//	        eje_ang_y(k) = acosd(ey*eig_vectors(:,1));
-//	        eje_ang_z(k) = acosd(ez*eig_vectors(:,1));
-//	    else
-//	        if isreal(eig_angles(2,2))
-//	            control(k)=2;
-//	            ejevector(:,k) = eig_vectors(:,2);
-//	            eje_ang_x(k) = acosd(ex*eig_vectors(:,2));
-//	            eje_ang_y(k) = acosd(ey*eig_vectors(:,2));
-//	            eje_ang_z(k) = acosd(ez*eig_vectors(:,2));
-//	        else
-//	            if isreal(eig_angles(3,3))
-//	                control(k)=3;
-//	                ejevector(:,k) = eig_vectors(:,3);
-//	                eje_ang_x(k) = acosd(ex*eig_vectors(:,3));
-//	                eje_ang_y(k) = acosd(ey*eig_vectors(:,3));
-//	                eje_ang_z(k) = acosd(ez*eig_vectors(:,3));
-//	            else
-//	                count_error = count_error + 1;
-//	            end
-//	        end
-//	    end
+		VEC_ELEM(axis,0) = VEC_ELEM(eigenvector,0);
+		VEC_ELEM(axis,2) = VEC_ELEM(eigenvector,2);
 
-
+		aux_axis_y = VEC_ELEM(eigenvector,1);
+		if (aux_axis_y<0){
+			VEC_ELEM(axis,1) = -aux_axis_y;}
+		else{
+			VEC_ELEM(axis,1) = aux_axis_y;
+		}
 
 		#ifdef DEBUG
 		std::cout << "alpha = " << alpha << std::endl;
@@ -391,72 +372,72 @@ void ProgValidationTiltPairs::validate(MetaData &md_u, MetaData &md_t, MetaData 
 		#endif
 
 		objId_out = md_out.addObject();
-		md_out.setValue(MDL_ITEM_ID, elementId_u,objId_out);
+		md_out.setValue(MDL_PARTICLE_ID, elementId_u,objId_out);
 		md_out.setValue(MDL_ANGLE_ROT, alpha, objId_out);
 		md_out.setValue(MDL_ANGLE_TILT, beta, objId_out);
 		md_out.setValue(MDL_ANGLE_PSI, gamma, objId_out);
-		/*
-		objId_out = md_out.addObject();
-		md_out.setValue(MDL_ITEM_ID, elementId_u,objId_out);
-		md_out.setValue(MDL_ROTAION_ANGLE, alpha, objId_out);
-		md_out.setValue(MDL_TILT_AXIS_X, alpha, objId_out);
-		md_out.setValue(MDL_TILT_AXIS_X, beta, objId_out);
-		md_out.setValue(MDL_TILT_AXIS_X, gamma, objId_out);
-		*/
+
+		objId_out2 = md_validation.addObject();
+		md_validation.setValue(MDL_PARTICLE_ID, elementId_u,objId_out2);
+		md_validation.setValue(MDL_ROTATION_ANGLE, rotated_angle, objId_out2);
+		md_validation.setValue(MDL_TILT_AXIS_X, VEC_ELEM(axis,0), objId_out2);
+		md_validation.setValue(MDL_TILT_AXIS_Y, VEC_ELEM(axis,1), objId_out2);
+		md_validation.setValue(MDL_TILT_AXIS_Z, VEC_ELEM(axis,2), objId_out2);
 	}
 	md_out.write((String)"particles@"+fnOut+"_angular_assignment"+".xmd");
 	md_validation.write((String)"particles@"+fnOut+"_angular_validation"+".xmd");
 }
 
 
-void ProgValidationTiltPairs::powerIterationMethod(const Matrix2D<double> M)
+void ProgValidationTiltPairs::powerIterationMethod(const Matrix2D<double> A, Matrix1D<double> &eigenvector, double &eigenvalueapprox)
 {
-	Matrix1D <double> seed, c;
-    double d=0,temp;
-    int i,j;
+	Matrix2D<double> eye, aux;
+	Matrix1D<double> vec_seed, c, b, b_check;
+	double Cte_norm, threshold = 0.0001;
+	int count = 0;
 
-    size_t n =M.mdimx;
-    //x is the input vector
+	eye.initIdentity(A.mdimx);
+	b.initZeros(A.mdimx);
+	c.initZeros(A.mdimx);
 
-    c.initZeros(n);
-    seed.initZeros(n);
+	randomize_random_generator();
+	VEC_ELEM(b,0) = double(std::rand())/RAND_MAX;
+	VEC_ELEM(b,1) = double(std::rand())/RAND_MAX;
+	VEC_ELEM(b,2) = sqrt(1 - VEC_ELEM(b,0)*VEC_ELEM(b,0) - VEC_ELEM(b,1)*VEC_ELEM(b,1));
 
-    VEC_ELEM(seed,0) = 0;
-    VEC_ELEM(seed,1) = 1;
-    VEC_ELEM(seed,2) = 0;
+	//std::cout << "Seed vector = " << b << std::endl;
 
-    do
-    {
-        for(i=0;i<n;i++)
-        {
-        	VEC_ELEM(c,i)=0;
-            for(j=0;j<n;j++)
-            	VEC_ELEM(c,i)+=MAT_ELEM(M,i,j)*VEC_ELEM(seed,j);
-        }
-        for(i=0;i<n;i++)
-        	VEC_ELEM(seed,i)=VEC_ELEM(c,i);
+	b_check = (A*b-b);
 
-        temp=d;
-        d=0;
+//	std::cout << "b_check" << b_check << std::endl;
+//	std::cout << "A*b" << A*b << std::endl;
 
-        for(i=0;i<n;i++)
-        {
-            if(fabs(VEC_ELEM(seed,i))>fabs(d))
-                d=VEC_ELEM(seed,i);
-        }
-        for(i=0;i<n;i++)
-        	VEC_ELEM(seed,i)/=d;
+	while ((fabs(VEC_ELEM(b_check, 0))>threshold) || (fabs(VEC_ELEM(b_check, 1))>threshold) || (fabs(VEC_ELEM(b_check, 2))>threshold))
+	{
+		aux = A-eye*eigenvalueapprox;
 
-    }while(fabs(d-temp)>0.00001);
+		c = aux.inv()* b;
+		Cte_norm = c.module();
+		c = c/Cte_norm;
+		b = c;
+		b_check = (A*b-b);
+	}
+	eigenvector = b;
+	//std::cout << "eigenvector = " << eigenvector << std::endl;
 
-    std::cout<<"Eigen value is : "<< d <<std::endl;
+	if ((isnan(VEC_ELEM(eigenvector, 0))) || (isnan(VEC_ELEM(eigenvector, 1))) || (isnan(VEC_ELEM(eigenvector, 2))))
+	{
+		//std::cout << "Recalculating" << std::endl;
+		powerIterationMethod(A, eigenvector, eigenvalueapprox);
+		count++;
+	}
 
-    std::cout<<"Eigenvector is: \n";
-    for(i=0;i<n;i++)
-    	std::cout<<VEC_ELEM(seed,i)<<std::endl;
-
+	if (count++>100)
+	{
+		std::cout << "Eigenvector could not be resolved" << std::endl;
+		exit(0);
+	}
 }
-
 
 
 void ProgValidationTiltPairs::run()
@@ -465,64 +446,36 @@ void ProgValidationTiltPairs::run()
 	MetaData md_u, md_t, md_mic, md_out, md_val;;
 
 	Matrix2D<double> M;
-	M.initZeros(3,3);
-
-	MAT_ELEM(M,0,0) = 0.6056;
-	MAT_ELEM(M,0,1) = -0.3741;
-	MAT_ELEM(M,0,2) = -0.7023;
-	MAT_ELEM(M,1,0) = -0.3110;
-	MAT_ELEM(M,1,1) = 0.7012;
-	MAT_ELEM(M,1,2) = -0.6416;
-	MAT_ELEM(M,2,0) = 0.7325;
-	MAT_ELEM(M,2,1) = 0.6070;
-	MAT_ELEM(M,2,2) = 0.3083;
-
-	powerIterationMethod(M);
+	Matrix1D<double> eigenvector;
 
 
-//	if (fnuntilt2assign != "" &&  fntilt2assign != "")
-//	{
-//		MetaData mduntilt_exp, mdtilt_exp;
-//		mduntilt_exp.read(fnuntilt2assign);
-//		mdtilt_exp.read(fntilt2assign);
-//
-//		std::cout << "Performing Untilted Assigning" << std::endl;
-//		assignAngles(mduntilt_exp, "untilted_assigned.xmd");
-//
-//		std::cout << "Performing Tilted Assigning" << std::endl;
-//		assignAngles(mdtilt_exp, "tilted_assigned.xmd");
-//
-//		md_u.read(fnuntilt);
-//		md_t.read(fntilt);
-//		validate(md_u, md_t, md_out, md_val);
-//
-////		rmatrixevd(const real_2d_array &a, const ae_int_t n, const ae_int_t vneeded, real_1d_array &wr, real_1d_array &wi, ...
-////				real_2d_array &vl, real_2d_array &vr);
-//
-////		FOR_ALL_OBJECTS_IN_METADATA(md_out)
-////		{
-////			md_u_sorted.getValue(MDL_ITEM_ID, elementId_u ,__iter.objId);
-////			md_u_sorted.getValue(MDL_ANGLE_ROT, rot_u ,__iter.objId);
-////			md_u_sorted.getValue(MDL_ANGLE_TILT, tilt_u,__iter.objId);
-////			md_u_sorted.getValue(MDL_ANGLE_PSI, psi_u,__iter.objId);
-////
-////			md_t_sorted.getValue(MDL_ITEM_ID, elementId_t,__iter2.objId);
-////			md_t_sorted.getValue(MDL_ANGLE_ROT, rot_t,__iter2.objId);
-////			md_t_sorted.getValue(MDL_ANGLE_TILT, tilt_t,__iter2.objId);
-////			md_t_sorted.getValue(MDL_ANGLE_PSI, psi_t,__iter2.objId);
-////		}
-//	}
-//	else
-//	{
-//		md_u.read(fnuntilt);
-//		md_t.read(fntilt);
-//
-//
-//		validate(md_u, md_t, md_out,md_val);
-//	}
+	if (fnuntilt2assign != "" &&  fntilt2assign != "")
+	{
+		MetaData mduntilt_exp, mdtilt_exp;
+		mduntilt_exp.read(fnuntilt2assign);
+		mdtilt_exp.read(fntilt2assign);
+
+		std::cout << "Performing Untilted Assigning" << std::endl;
+		assignAngles(mduntilt_exp, "untilted_assigned.xmd");
+
+		std::cout << "Performing Tilted Assigning" << std::endl;
+		assignAngles(mdtilt_exp, "tilted_assigned.xmd");
+
+		md_u.read(fnuntilt);
+		md_t.read(fntilt);
+
+		validate(md_u, md_t, md_out, md_val);
+	}
+	else
+	{
+		md_u.read(fnuntilt);
+		md_t.read(fntilt);
+
+		validate(md_u, md_t, md_out,md_val);
+	}
 
 
-
+std::cout << "Finished!" << std::endl;
 
 
 

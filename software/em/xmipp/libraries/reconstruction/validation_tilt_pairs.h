@@ -69,7 +69,7 @@ public:
 
     void validate(MetaData &md_u, MetaData &md_t, MetaData &md_out, MetaData &md_validation);
 
-    void powerIterationMethod(const Matrix2D<double> M);
+    void powerIterationMethod(const Matrix2D<double> A, Matrix1D<double> &eigenvector, double &eigenvalueapprox);
 
     /// Execute the program
     void run();
