@@ -132,6 +132,11 @@ class XmippProtRCT(ProtInitialVolume):
         uImages = self.inputParticlesTiltPair.get().getUntilted()
         tImages = self.inputParticlesTiltPair.get().getTilted()
         sangles = self.inputParticlesTiltPair.get().getCoordsPair().getAngles()
+        print '--------------'
+        sangles.printAll()
+        for a in sangles:
+            a.printAll()
+        print '--------------'
 
         uMics = self.inputParticlesTiltPair.get().getCoordsPair().getMicsPair().getUntilted()
         tMics = tImages.getCoordinates().getMicrographs()
@@ -154,6 +159,10 @@ class XmippProtRCT(ProtInitialVolume):
                 micId = uCoord.getMicId()
                 uMic = uMics[micId]
                 angles = sangles[micId]
+                print '..................'
+                print micId
+                print angles
+                print '..................'                
                 pairRow.setValue(xmipp.MDL_MICROGRAPH, uMic.getFileName())
                 pairRow.setValue(xmipp.MDL_XCOOR, uCoord.getX())
                 pairRow.setValue(xmipp.MDL_YCOOR, uCoord.getY())
@@ -171,6 +180,9 @@ class XmippProtRCT(ProtInitialVolume):
                 tMic = tMics[micId]
                 pairRow.setValue(xmipp.MDL_MICROGRAPH_TILTED, tMic.getFileName())
                 (angleY, angleY2, angleTilt) = angles.getAngles()
+                print '////////////'
+                print angleY, angleY2, angleTilt
+                print '////////////'
                 pairRow.setValue(xmipp.MDL_ANGLE_Y, float(angleY))
                 pairRow.setValue(xmipp.MDL_ANGLE_Y2, float(angleY2))
                 pairRow.setValue(xmipp.MDL_ANGLE_TILT, float(angleTilt))

@@ -28,6 +28,7 @@
 #include <data/matrix1d.h>
 #include <data/metadata_extension.h>
 #include <complex>
+#include <cmath>
 //#include <external/alglib/src/linalg.h>
 //#define DEBUG
 //#define DEBUG1
@@ -42,238 +43,23 @@ void ProgValidationTiltPairs::defineParams()
     //Usage
     addUsageLine("Takes two coordinates sets and determines the transformation between them");
 	addUsageLine("First set defines the untilted coordinates, second set defines the tilted coordinates");
-	addParamsLine(" --tilt <md_file=\"\"> : Metadata with angular assignment for the tilted images");
-	addParamsLine(" --untilt <md_file=\"\"> : Metadata with angular assignment for the untilted images");
-
-	addParamsLine(" --untilt2assign <md_file=\"\"> : Metadata with untilted particles to be angular assigned");
-	addParamsLine(" --tilt2assign <md_file=\"\"> : Metadata with tilted particles to be angular assigned");
-
-	addParamsLine(" -o <md_file=\"\"> : Metadata with matrix transformation");
-
+	addParamsLine(" --untilt <md_file=\"\">     : Metadata with angular assignment for the untilted images");
+	addParamsLine(" --tilt <md_file=\"\">       : Metadata with angular assignment for the tilted images");
+	addParamsLine("  [--sym <symfile=c1>]       : Enforce symmetry in projections");
+	addParamsLine(" --odir <md_file=\"\">        : Metadata with matrix transformation");
 	addParamsLine("  [--vol <img_file=\"\">]    : Input reference volume");
-	addParamsLine("  [--angular_sampling <s=5>]   : Angular sampling rate in degrees. This sampling "
-			"represents the accuracy for assigning directions");
-	addParamsLine("  [--maxshift <s=10>]   : Maximum shift for aligning images (in pixels)");
 }
 
 
 //Read params
 void ProgValidationTiltPairs::readParams()
 {
-    fntilt = getParam("--tilt");  //Set of tilted coordinates
-    fnuntilt = getParam("--untilt");
-    fnuntilt2assign = getParam("--untilt2assign");
-    fntilt2assign = getParam("--tilt2assign");
-	fnOut = getParam("-o");  //Output file
-	fnVol = getParam("--vol");
-	smprt = getDoubleParam("--angular_sampling");
-	maxshift = getIntParam("--maxshift");
+	fnuntilt = getParam("--untilt");
+	fntilt = getParam("--tilt");  //Set of tilted coordinates
+	fnSym = getParam("--sym");
+    fnOut = getParam("--odir");  //Output file
 }
 
-void ProgValidationTiltPairs::generateFourierStackTP(const MultidimArray<double> &input_stack,
-															std::vector< AlignmentTransforms> &galleryTransforms_Test)
-{
-	FourierTransformer transformer;
-	AlignmentAux aux2;
-	MultidimArray<double> mGalleryProjection;
-
-	// Calculate transforms of this stack
-	size_t kmax = NSIZE(input_stack);
-
-	galleryTransforms_Test.resize(kmax);
-
-	for (size_t k=0; k<kmax; ++k)
-	{
-		mGalleryProjection.aliasImageInStack(input_stack,k);
-		mGalleryProjection.setXmippOrigin();
-
-		AlignmentTransforms imageTransforms_Test;
-		transformer.FourierTransform(mGalleryProjection, imageTransforms_Test.FFTI, true);
-		size_t Ydim, Xdim, Zdim, Ndim;
-		imageTransforms_Test.FFTI.getDimensions(Xdim, Ydim, Zdim, Ndim);
-		normalizedPolarFourierTransform(mGalleryProjection, imageTransforms_Test.polarFourierI, false,
-										XSIZE(mGalleryProjection) / 5, XSIZE(mGalleryProjection) / 2, aux2.plans, 1);
-
-		galleryTransforms_Test[k] = imageTransforms_Test;
-
-	}
-}
-
-
-void ProgValidationTiltPairs::assignAngles(const MetaData mduntilt_exp, FileName fnun_out)
-{
-
-	size_t len_p, idxp, Xdim, Ydim, Zdim, Ndim, len_u;
-	Matrix2D<double> angles_rot_tilt, transformation_matrix, position_u_gallery_and_psi;
-	MetaData mdproj;
-	Image<double> imgstack, Img_vol, ImgUn_exp;
-	MultidimArray<double> ImgUn_exp_copy, imgGallery, imgGallery_orig, ImgUn_exp_copy2;
-	double rot, tilt, psi;
-	FileName Untilted_filename_aux, fnuntilt_exp;
-	std::vector<std::string> Untilted_filenames;
-	std::vector< AlignmentTransforms> galleryTransform_;
-	AlignmentAux aux_u;
-	RotationalCorrelationAux aux3;
-	CorrelationAux aux2;
-
-	std::cout << "Generating projections" << std::endl;
-	String args=formatString("-i %s -o gallery.stk --sampling_rate %f", fnVol.c_str(), smprt);
-			//We are considering the psi sampling = angular sampling rate
-
-	String cmd=(String)"xmipp_angular_project_library " + args;
-	system(cmd.c_str());
-
-	FileName fnprojection = formatString("%s/gallery.doc",fnOut.c_str());
-	mdproj.read(fnprojection);
-	len_p = mdproj.size();
-
-
-	imgstack.read(fnOut+"/gallery.stk");
-
-	const MultidimArray<double> allGalleryProjection = imgstack();
-		//State: Finished
-
-	angles_rot_tilt.initZeros(len_p,2); //first column is the rot angle and second column is the tilt angle
-
-	idxp = 0;
-	FOR_ALL_OBJECTS_IN_METADATA(mdproj)
-	{
-		mdproj.getValue(MDL_ANGLE_ROT, rot, __iter.objId);
-		mdproj.getValue(MDL_ANGLE_TILT, tilt, __iter.objId);
-
-		MAT_ELEM(angles_rot_tilt, idxp, 0) = rot;
-		MAT_ELEM(angles_rot_tilt, idxp, 1) = tilt;
-		++idxp;
-	}
-
-	//For each experimental untilted image, an angular assignment is performed
-	std::cout << "Searching correlations" << std::endl;
-
-	Img_vol.read(fnVol);
-	Img_vol().setXmippOrigin();
-
-	mduntilt_exp.getValue(MDL_IMAGE, Untilted_filename_aux, 1);
-	ImgUn_exp.read(Untilted_filename_aux);
-	ImgUn_exp.getDimensions(Xdim, Ydim, Zdim, Ndim);
-
-	//Xdim = NSIZE(Img_vol);
-	int Xdim_int = (int) Xdim;
-	int Ydim_int = (int) Ydim;
-
-	generateFourierStackTP(allGalleryProjection, galleryTransform_); //Untilted
-
-	size_t idx =0;
-
-	len_u = mduntilt_exp.size();
-
-	position_u_gallery_and_psi.initZeros(7,len_u);
-
-	FOR_ALL_OBJECTS_IN_METADATA(mduntilt_exp)
-	{
-		mduntilt_exp.getValue(MDL_IMAGE, fnuntilt_exp, __iter.objId);
-		Untilted_filenames.push_back(fnuntilt_exp);
-
-		ImgUn_exp.read(fnuntilt_exp);	//Reading image
-		ImgUn_exp().setXmippOrigin();
-
-		ImgUn_exp_copy = ImgUn_exp();
-
-		std::cout << "-----------------" <<std::endl;
-		std::cout << fnuntilt_exp << "  " << std::endl;
-		std::cout << "-----------------" <<std::endl;
-
-		double corr=0, bestcorr = 0;
-
-		for (size_t j = 1; j< len_p; j++)
-		{
-			//std::cout << "j = " << j << std::endl;
-			imgGallery.aliasImageInStack(allGalleryProjection,j);
-			imgGallery_orig = imgGallery;
-			imgGallery_orig.setXmippOrigin();
-			ImgUn_exp_copy2 = ImgUn_exp();
-
-//			CORRELATION UNTILT AND PROJECTIONS
-			corr = alignImages(imgGallery_orig, galleryTransform_[j], ImgUn_exp_copy2, transformation_matrix, true, aux_u, aux2, aux3);
-
-			if ((fabs(MAT_ELEM(transformation_matrix, 0, 2)) > maxshift) || (fabs(MAT_ELEM(transformation_matrix, 1, 2)) > maxshift))
-				continue;
-
-			if ((corr <0.7*bestcorr) || (corr<0))
-				continue;
-
-//			//UNTILT ASSIGNMENT
-			double psi = atan2( MAT_ELEM(transformation_matrix,1,0), MAT_ELEM(transformation_matrix,0,0) )*180/PI;
-
-
-
-			if (corr>bestcorr)
-			{
-//					std::cout << "j = " << j << std::endl;
-			#ifdef DEBUG1
-			std::cout << "rot = " << MAT_ELEM(angles_rot_tilt, j, 0) << std::endl;
-			std::cout << "tilt = " << MAT_ELEM(angles_rot_tilt, j, 1) << std::endl;
-			std::cout << "psi = " << psi << std::endl;
-			std::cout << "corr = " << corr << std::endl;
-			char ch;
-			ch = getchar();
-			#endif
-				#ifdef DEBUG
-				std::cout << "j = " << j << std::endl;
-				std::cout << fnuntilt_exp << "  " << std::endl;
-				//UNTILTED PARTICLE
-				Image<double> save;
-				save()=ImgUn_exp();
-				save.write("PPPExp_img.xmp");  //Experimental image
-
-				save()=ImgUn_exp_copy2;
-				save.write("PPPExp_img_rot.xmp");  //Experimental rotated image
-
-				save()=imgGallery_orig;
-				save.write("PPPGal_img.xmp");  //Gallery image
-
-				std::cout << "rot = " << MAT_ELEM(angles_rot_tilt, j, 0) << std::endl;
-				std::cout << "tilt = " << MAT_ELEM(angles_rot_tilt, j, 1) << std::endl;
-				std::cout << "psi = " << psi << std::endl;
-				std::cout << "corr = " << corr << std::endl;
-
-				char c;
-				getchar();
-				#endif
-				bestcorr = corr;
-				MAT_ELEM(position_u_gallery_and_psi, 0, idx) = j;
-				MAT_ELEM(position_u_gallery_and_psi, 1, idx) = MAT_ELEM(angles_rot_tilt, j, 0);
-				MAT_ELEM(position_u_gallery_and_psi, 2, idx) = MAT_ELEM(angles_rot_tilt, j, 1);
-				MAT_ELEM(position_u_gallery_and_psi, 3, idx) = psi;
-				MAT_ELEM(position_u_gallery_and_psi, 4, idx) = corr;
-				MAT_ELEM(position_u_gallery_and_psi, 5, idx) = -MAT_ELEM(transformation_matrix,0,2);  // X Shift  in untilted image
-				MAT_ELEM(position_u_gallery_and_psi, 6, idx) = -MAT_ELEM(transformation_matrix,1,2);  // Y Shift
-
-			}
-		}
-		++idx;
-	}
-
-	MetaData mduntilt_output;
-	size_t objId_un;
-
-	for (size_t k=0; k<(len_u); k++)
-	{
-		//std::cout << "Iteration = " << k << std::endl;
-
-		objId_un = mduntilt_output.addObject();
-		//std::cout << "ObjeId_un = " << objId_un << std::endl;
-		mduntilt_output.setValue(MDL_IMAGE, Untilted_filenames[k], objId_un);
-		mduntilt_output.setValue(MDL_PARTICLE_ID, k+1, objId_un);
-		mduntilt_output.setValue(MDL_ANGLE_ROT, MAT_ELEM(position_u_gallery_and_psi, 1, k), objId_un);
-		mduntilt_output.setValue(MDL_ANGLE_TILT, MAT_ELEM(position_u_gallery_and_psi, 2, k), objId_un);
-		mduntilt_output.setValue(MDL_ANGLE_PSI, MAT_ELEM(position_u_gallery_and_psi, 3, k), objId_un);
-		mduntilt_output.setValue(MDL_MAXCC, MAT_ELEM(position_u_gallery_and_psi, 4, k), objId_un);
-		mduntilt_output.setValue(MDL_SHIFT_X, MAT_ELEM(position_u_gallery_and_psi, 5, k), objId_un);
-		mduntilt_output.setValue(MDL_SHIFT_Y, MAT_ELEM(position_u_gallery_and_psi, 6, k), objId_un);
-	}
-
-	mduntilt_output.write(fnOut+"/"+fnun_out);
-}
 
 void ProgValidationTiltPairs::validate(MetaData &md_u, MetaData &md_t, MetaData &md_out, MetaData &md_validation)
 {
@@ -384,8 +170,8 @@ void ProgValidationTiltPairs::validate(MetaData &md_u, MetaData &md_t, MetaData 
 		md_validation.setValue(MDL_TILT_AXIS_Y, VEC_ELEM(axis,1), objId_out2);
 		md_validation.setValue(MDL_TILT_AXIS_Z, VEC_ELEM(axis,2), objId_out2);
 	}
-	md_out.write((String)"particles@"+fnOut+"_angular_assignment"+".xmd");
-	md_validation.write((String)"particles@"+fnOut+"_angular_validation"+".xmd");
+	md_out.write((String)"particles@"+fnOut+"/_angular_assignment"+".xmd");
+	md_validation.write((String)"particles@"+fnOut+"/_angular_validation"+".xmd");
 }
 
 
@@ -440,45 +226,128 @@ void ProgValidationTiltPairs::powerIterationMethod(const Matrix2D<double> A, Mat
 }
 
 
+double ProgValidationTiltPairs::R0_ThresholdFisher(int N)
+{
+	double R0=sqrt(N*3.782);
+	return R0;
+}
+
+void ProgValidationTiltPairs::R_Fisher(MetaData md, MetaData &md_scattering)
+{
+	double SumRx, SumRy, SumRz, R_aux, R, theta;
+	size_t objId_scttr;
+	Matrix1D<double> orth_vector, axis_mean, axis_aux, rot_vector;
+	Matrix2D<double> Rodrigues_mat;
+	orth_vector.initZeros(3);
+	rot_vector.initZeros(3);
+
+	R_aux = R_Value(md, SumRx, SumRy, SumRz);
+
+	axis_mean.initZeros(3);
+	axis_aux.initZeros(3);
+
+	VEC_ELEM(axis_mean,0) = SumRx*(1/R_aux);
+	VEC_ELEM(axis_mean,1) = SumRy*(1/R_aux);
+	VEC_ELEM(axis_mean,2) = SumRz*(1/R_aux);
+
+	FOR_ALL_OBJECTS_IN_METADATA(md)
+	{
+		md.getValue(MDL_ROTATION_ANGLE, theta, __iter.objId);
+		md.getValue(MDL_TILT_AXIS_X, VEC_ELEM(axis_aux,0), __iter.objId);
+		md.getValue(MDL_TILT_AXIS_Y, VEC_ELEM(axis_aux,1), __iter.objId);
+		md.getValue(MDL_TILT_AXIS_Z, VEC_ELEM(axis_aux,2), __iter.objId);
+
+		orth_vector = vectorProduct(axis_mean, axis_aux);
+
+		Rodrigues_mat = RodriguesMatrix(theta, axis_aux);
+		rot_vector = Rodrigues_mat*orth_vector;
+
+		objId_scttr = md_scattering.addObject();
+		md_scattering.setValue(MDL_TILT_AXIS_X, VEC_ELEM(rot_vector,0), objId_scttr);
+		md_scattering.setValue(MDL_TILT_AXIS_Y, VEC_ELEM(rot_vector,1), objId_scttr);
+		md_scattering.setValue(MDL_TILT_AXIS_Z, VEC_ELEM(rot_vector,2), objId_scttr);
+	}
+}
+
+Matrix2D<double> ProgValidationTiltPairs::RodriguesMatrix( const double theta, const Matrix1D<double> axis)
+{
+	double k1 = VEC_ELEM(axis,0);
+	double k2 = VEC_ELEM(axis,1);
+	double k3 = VEC_ELEM(axis,2);
+
+	Matrix2D<double> K, Id, R;
+	Id.initIdentity(3);
+
+	K.initZeros(3,3);
+
+	MAT_ELEM(K, 0, 1) = -k3;
+	MAT_ELEM(K, 1, 0) = k3;
+	MAT_ELEM(K, 0, 2) = k2;
+	MAT_ELEM(K, 2, 0) = -k2;
+	MAT_ELEM(K, 1, 2) = -k1;
+	MAT_ELEM(K, 2, 1) = k1;
+
+	double theta_rad = theta*PI/180;
+	R = Id + sin(theta_rad)*K + (1-cos(theta_rad))*K*K;
+
+	return R;
+}
+
+double ProgValidationTiltPairs::R_Value(MetaData md, double &SumRx, double &SumRy, double &SumRz)
+{
+	//double R_fisher = ;
+	SumRx = 0;
+	SumRy = 0;
+	SumRz = 0;
+
+	double Rx, Ry, Rz;
+
+	FOR_ALL_OBJECTS_IN_METADATA(md)
+	{
+		md.getValue(MDL_TILT_AXIS_X, Rx, __iter.objId);
+		md.getValue(MDL_TILT_AXIS_Y, Ry, __iter.objId);
+		md.getValue(MDL_TILT_AXIS_Z, Rz, __iter.objId);
+
+		SumRx = SumRx + Rx;
+		SumRy = SumRy + Ry;
+		SumRz = SumRz + Rz;
+	}
+	double R = sqrt(SumRx*SumRx + SumRy*SumRy + SumRz*SumRz);
+	return R;
+}
+
+
+double ProgValidationTiltPairs::confidenceSolidAngle(double R, int Nparticles, double confidence)
+{
+	double aux1 = pow((1/confidence),((1/Nparticles)-1)) - 1;
+	double aux2 = (Nparticles-R)/R;
+	double alpha_th = acos(1-aux2*aux1);
+
+	return alpha_th;
+}
+
+
+
 void ProgValidationTiltPairs::run()
 {
 	std::cout << "Starting..." << std::endl;
-	MetaData md_u, md_t, md_mic, md_out, md_val;;
+	MetaData md_u, md_t, md_mic, md_out, md_val, md_scattering;
 
 	Matrix2D<double> M;
 	Matrix1D<double> eigenvector;
 
+	md_u.read(fnuntilt);
+	md_t.read(fntilt);
 
-	if (fnuntilt2assign != "" &&  fntilt2assign != "")
-	{
-		MetaData mduntilt_exp, mdtilt_exp;
-		mduntilt_exp.read(fnuntilt2assign);
-		mdtilt_exp.read(fntilt2assign);
+	validate(md_u, md_t, md_out, md_val);
 
-		std::cout << "Performing Untilted Assigning" << std::endl;
-		assignAngles(mduntilt_exp, "untilted_assigned.xmd");
+	R_Fisher(md_val, md_scattering);
 
-		std::cout << "Performing Tilted Assigning" << std::endl;
-		assignAngles(mdtilt_exp, "tilted_assigned.xmd");
-
-		md_u.read(fnuntilt);
-		md_t.read(fntilt);
-
-		validate(md_u, md_t, md_out, md_val);
-	}
-	else
-	{
-		md_u.read(fnuntilt);
-		md_t.read(fntilt);
-
-		validate(md_u, md_t, md_out,md_val);
-	}
+	FileName fn_scattering = formatString("particles@%s/scatter_md.xmd", fnOut.c_str());
+	FileName fn_val = formatString("particles@%s/validate_md.xmd", fnOut.c_str());
+	md_scattering.write(fn_scattering);
+	md_val.write(fn_scattering);
 
 
-std::cout << "Finished!" << std::endl;
-
-
-
+	std::cout << "Finished!" << std::endl;
 }
-
-

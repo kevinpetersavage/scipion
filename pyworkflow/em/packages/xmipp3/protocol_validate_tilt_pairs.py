@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:     Javier Vargas (jvargas@cnb.csic.es)
+# * Authors:     Jose Luis Vilas (jlvilas@cnb.csic.es)
 # *
 # * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
 # *
@@ -25,12 +25,10 @@
 # **************************************************************************
 
 from os.path import join
-from pyworkflow.object import Float, String
-from pyworkflow.protocol.params import (PointerParam, FloatParam, STEPS_PARALLEL,
-                                        StringParam, EnumParam, LEVEL_ADVANCED)
+from pyworkflow.protocol.params import (PointerParam, StringParam)
 from pyworkflow.em.data import Volume
 from pyworkflow.em.protocol import ProtAnalysis3D
-from pyworkflow.utils.path import moveFile, makePath
+from pyworkflow.utils.path import makePath
 from pyworkflow.em.packages.xmipp3.convert import writeSetOfParticles
 import pyworkflow.em.metadata as md
 
@@ -39,34 +37,30 @@ PROJECTION_MATCHING = 0
 SIGNIFICANT = 1
 
 
-class XmippProtValidateNonTilt(ProtAnalysis3D):
+class XmippProtValidateTiltPairs(ProtAnalysis3D):
     """    
-    Ranks a set of volumes according to their alignment reliability obtained from a clusterability test.
+    Validate if a set of Tilt Pairs have been well assigned.
     """
-
-    _label = 'validate_nontilt'
-    WEB = 0
-
+    _label = 'validate_Tilt_Pairs'
     
     def __init__(self, *args, **kwargs):
         ProtAnalysis3D.__init__(self, *args, **kwargs)
-        
-        if (self.WEB == 1):
-            self.stepsExecutionMode = STEPS_PARALLEL
-        
+       
+       
     #--------------------------- DEFINE param functions --------------------------------------------   
     def _defineParams(self, form):
         form.addSection(label='Input')
         
-        form.addParam('inputVolumes', PointerParam, pointerClass='SetOfVolumes, Volume',
-                      label="Input volumes",  
-                      help='Select the input volumes.')     
-        form.addParam('inputParticles', PointerParam, pointerClass='SetOfParticles, SetOfClasses2D', 
-                      label="Input particles",  
-                      help='Select the input projection images .') 
+        form.addParam('inputUntilt', PointerParam, pointerClass='SetOfParticles', 
+                      label="Input Untilt particles",  
+                      help='Select the input untilt particles')
+        form.addParam('inputTilt', PointerParam, pointerClass='SetOfParticles', 
+                      label="Input Tilt particles",  
+                      help='Select the input tilt particles')  
         form.addParam('symmetryGroup', StringParam, default='c1',
                       label="Symmetry group", 
-                      help='See [[Xmipp Symmetry][http://www2.mrc-lmb.cam.ac.uk/Xmipp/index.php/Conventions_%26_File_formats#Symmetry]] page '
+                      help='Symmetry group, only c1,..., cn, or d1, ... dn.'
+                       'See [[Xmipp Symmetry][http://www2.mrc-lmb.cam.ac.uk/Xmipp/index.php/Conventions_%26_File_formats#Symmetry]] page '
                            'for a description of the symmetry format accepted by Xmipp') 
         
         form.addParallelSection(threads=0, mpi=4)
@@ -74,71 +68,48 @@ class XmippProtValidateNonTilt(ProtAnalysis3D):
     #--------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):        
         deps = [] # store volumes steps id to use as dependencies for last step
-        self.partSet = self.inputParticles.get()
         
-        convertId = self._insertFunctionStep('convertInputStep', self.partSet.getObjId())
+        #convert step split and stores particletiltpair in two sets, untilted, and tilted
+        convertId = self._insertFunctionStep('convertInputStep')
         
-        volStepId = self._insertFunctionStep('validationStep', vol.getObjId(), prerequisites=[sigStepId])
+        fnuntilted = self._getExtraPath("untilted/untiltedpaticles.xmd")
+        fntilted = self._getExtraPath("tilted/tiltedpaticles.xmd")
+         
+        volStepId = self._insertFunctionStep('validationStep', fnuntilted, fntilted, prerequisites=[convertId])
         deps.append(volStepId)
-        
-        self._insertFunctionStep('createOutputStep', prerequisites=deps)
+#         
+#         self._insertFunctionStep('createOutputStep', prerequisites=deps)
     
     #--------------------------- STEPS functions ---------------------------------------------------
-    def convertInputStep(self, particlesId):
-        """ Write the input images as a Xmipp metadata file. 
-        particlesId: is only need to detect changes in
-        input particles and cause restart from here.
+    def convertInputStep(self):
+        """ Write the input images as a Xmipp metadata file.
         """
-        writeSetOfParticles(self.partSet, 
-                            self._getMdParticles())
+        makePath(self._getExtraPath("untilted"))
+        makePath(self._getExtraPath("tilted"))
+        
+        untiltedSet = self.inputUntilt.get()
+        tiltedSet = self.inputTilt.get()
+
+        writeSetOfParticles(untiltedSet, self._getExtraPath("untilted/untiltedpaticles.xmd"))
+        writeSetOfParticles(tiltedSet, self._getExtraPath("tilted/tiltedpaticles.xmd"))
+
     
-    def validationStep(self, volId):
-        params = {"inputAngles" : self._getAnglesMd(volId),
-                  "filtVol" : self._getVolFiltered(volId),
-                  "symmetry" : self.symmetryGroup.get(),
-                  "significance" : self.significanceNoise.get(),
-                  "outDir" : self._getVolDir(volId)
-                  }
-        
-        args = ' --i %(inputAngles)s --volume %(filtVol)s --odir %(outDir)s'
-        args += ' --significance_noise %(significance)0.2f --sym %(symmetry)s'
-        
-        if (self.alignmentMethod == SIGNIFICANT):
-            args += ' --useSignificant '
-        
-        self.runJob('xmipp_validation_nontilt', args % params)
+    def anglesStep(self):
+        print 'acabado'
     
-    def createOutputStep(self):
-        outputVols = self._createSetOfVolumes()
-        
-        for vol in self._iterInputVols():
-            volume = vol.clone()
-            volDir = self._getVolDir(vol.getObjId())
-            volPrefix = 'vol%03d_' % (vol.getObjId())
-            validationMd = self._getExtraPath(volPrefix + 'validation.xmd')
-            moveFile(join(volDir, 'validation.xmd'), 
-                     validationMd)
-            clusterMd = self._getExtraPath(volPrefix + 'clusteringTendency.xmd')
-            moveFile(join(volDir, 'clusteringTendency.xmd'), clusterMd)
-            
-            mData = md.MetaData(validationMd)
-            weight = mData.getValue(md.MDL_WEIGHT, mData.firstObject())
-            volume._xmipp_weight = Float(weight)
-            volume.clusterMd = String(clusterMd)
-            volume.cleanObjId() # clean objects id to assign new ones inside the set
-            outputVols.append(volume)
-        
-        outputVols.setSamplingRate(self.partSet.getSamplingRate())
-        self._defineOutputs(outputVolumes=outputVols)
-        self._defineTransformRelation(self.inputVolumes, outputVols)
+    def validationStep(self, fnuntilt, fntilt):
+        params =  ' --untilt %s' % fnuntilt
+        params += ' --tilt %s' % fntilt
+        params += ' --sym %s' % self.symmetryGroup.get()
+        params += ' --odir %s' % self._getExtraPath()
+
+        self.runJob('xmipp_validation_tilt_pairs', params)
     
     #--------------------------- INFO functions -------------------------------------------- 
     def _validate(self):
         validateMsgs = []
         # if there are Volume references, it cannot be empty.
-        if self.inputVolumes.get() and not self.inputVolumes.hasValue():
-            validateMsgs.append('Please provide an input reference volume.')
-        if self.inputParticles.get() and not self.inputParticles.hasValue():
+        if self.inputTilt.get() and not self.inputTilt.hasValue():
             validateMsgs.append('Please provide input particles.')            
         return validateMsgs
     
@@ -164,57 +135,4 @@ class XmippProtValidateNonTilt(ProtAnalysis3D):
         return messages
     
     def _citations(self):
-        return ['Vargas2014a']
-    
-    #--------------------------- UTILS functions --------------------------------------------
-    def _getVolDir(self, volIndex):
-        return self._getExtraPath('vol%03d' % volIndex)
-    
-    def _getVolFiltered(self, volIndex):
-        return self._getVolDir(volIndex) + "_filt.vol"
-    
-    def _iterInputVols(self):
-        """ In this function we will encapsulate the logic
-        to iterate through the input volumes.
-        This give the flexibility of having Volumes, SetOfVolumes or 
-        a combination of them as input and the protocol code
-        remain the same.
-        """
-        inputVols = self.inputVolumes.get()
-        
-        if isinstance(inputVols, Volume):
-            yield inputVols
-        else:
-            for vol in inputVols:
-                yield vol
-    
-    def _defineMetadataRootName(self, mdrootname,volId):
-        if mdrootname=='P':
-            VolPrefix = 'vol%03d_' % (volId)
-            return self._getExtraPath(VolPrefix+'clusteringTendency.xmd')
-        if mdrootname=='Volume':
-
-            VolPrefix = 'vol%03d_' % (volId)
-            return self._getExtraPath(VolPrefix+'validation.xmd')
-            
-    def _definePName(self):
-        fscFn = self._defineMetadataRootName('P')
-        return fscFn
-    
-    def _defineVolumeName(self,volId):
-        fscFn = self._defineMetadataRootName('Volume', volId)
-        return fscFn
-    
-    def _getMdParticles(self):
-        return self._getPath('input_particles.xmd')
-    
-    def _getGalleryStack(self, volIndex):
-        return join(self._getVolDir(volIndex), 'gallery.stk')
-    
-    def _getGalleryMd(self, volIndex):
-        return join(self._getVolDir(volIndex), 'gallery.doc')
-    
-    def _getAnglesMd(self, volIndex):
-        return join(self._getVolDir(volIndex), 'angles_iter001_00.xmd')
-    
-    
+        return ['Not yet']

@@ -45,13 +45,7 @@ class ProgValidationTiltPairs: public XmippProgram
 {
 public:
     /**  Filename untilt and tilt particles, reference volume */
-    FileName fntilt, fnuntilt, fnOut, fnVol, fnuntilt2assign, fntilt2assign;
-
-    /** Double for sampling projections, each projection will be performed each smprt degrees*/
-    double smprt;
-
-    /*** Maximum shift for aligning */
-    int maxshift;
+    FileName fntilt, fnuntilt, fnOut, fnSym;
 
 public:
     /// Define parameters in the command line
@@ -60,16 +54,19 @@ public:
     /// Read parameters from the command line
     void readParams();
 
-    /// Generating a galllery of projections
-    void generateProjections(FileName fnVol, double smprt);
-
-    void generateFourierStackTP(const MultidimArray<double> &input_stack, std::vector< AlignmentTransforms> &galleryTransforms_Test);
-
-    void assignAngles(const MetaData mduntilt_exp, FileName fnun_out);
-
     void validate(MetaData &md_u, MetaData &md_t, MetaData &md_out, MetaData &md_validation);
 
     void powerIterationMethod(const Matrix2D<double> A, Matrix1D<double> &eigenvector, double &eigenvalueapprox);
+
+    double R0_ThresholdFisher(int N);
+
+    void R_Fisher(MetaData md, MetaData &md_scattering);
+
+    double R_Value(MetaData md, double &SumRx, double &SumRy, double &SumRz);
+
+    Matrix2D<double> RodriguesMatrix( const double theta, const Matrix1D<double> axis);
+
+    double confidenceSolidAngle(double R, int Nparticles, double confidence = 0.01);
 
     /// Execute the program
     void run();

@@ -27,7 +27,7 @@
 from itertools import izip
 from os.path import split, splitext, join
 
-from pyworkflow.protocol.params import (PointerParam, FloatParam, BooleanParam, StringParam, STEPS_PARALLEL, LEVEL_ADVANCED)
+from pyworkflow.protocol.params import (PointerParam, IntParam, FloatParam, BooleanParam, StringParam, STEPS_PARALLEL, LEVEL_ADVANCED)
 from pyworkflow.em.metadata import MetaData, getBlocksInMetaDataFile
 from convert import readSetOfVolumes, getImageLocation
 from pyworkflow.em.protocol.protocol_3d import ProtRefine3D
@@ -35,6 +35,9 @@ from pyworkflow.em.metadata.constants import (MDL_ANGLE_Y, MDL_IMAGE, MDL_ANGLE_
                                               MD_APPEND, MDL_MICROGRAPH_ID)
 from pyworkflow.em.data import Volume
 from shutil import copyfile
+from pyworkflow.em.convert import ImageHandler
+import pyworkflow.em as em
+from pyworkflow.em.packages.xmipp3.convert import readSetOfParticles
 
 
 
@@ -72,6 +75,10 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
                       label="Initial Volumen",   
                       help='Select an initial volumen for assigning angles.')
         
+        form.addParam('Resizing', BooleanParam, default=True,
+                      label="Should the images be resized?", 
+                      help='Resize images for speeding up the processing.)')
+        
         form.addParam('maxshift', FloatParam, default=10, expertLevel=LEVEL_ADVANCED,
                       label="Maximum shift",  
                       help='Maximum shift for aligning images. If the obtained shift in the alignment'
@@ -99,6 +106,10 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
                       help='The images are downsampled in order to speed up the process'
                       'by default = 0.4')
         
+        form.addParam('maxFreq', IntParam, default=12, expertLevel=LEVEL_ADVANCED,
+                      label='Max frequency of the initial volume',
+                      help=' Max frequency of the initial volume in Angstroms')
+        
         form.addParallelSection(threads=1, mpi=1)
 
     #--------------------------- INSERT steps functions --------------------------------------------
@@ -111,26 +122,109 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
         convertId = self._insertFunctionStep('convertInputStep')
         deps = []
                  
-        fnUntilt = self._getExtraPath() + '/all_untilted_particles_input.xmd'
-        fnTilt = self._getExtraPath() + '/all_tilted_particles_input.xmd'
-        fnmic = self._getExtraPath() + '/Mic_angles.xmd'
-         
-        maskId = self._insertFunctionStep('mask2InputParticles', fnUntilt, fnTilt, prerequisites=[convertId])
-         
-         
+        fnUntilt = self._getExtraPath('all_untilted_particles_input.xmd')
+        fnTilt = self._getExtraPath('all_tilted_particles_input.xmd')
+        fnmic = self._getExtraPath('Mic_angles.xmd')
+        
+        self.Xdim = self.tilpairparticles.get().getUntilted().getDimensions()[0] 
+        if self.Resizing.get() == True:
+            filteresId = self._insertFunctionStep('filterResizeStep', self.Xdim, fnUntilt, fnTilt, prerequisites=[convertId])
+            fnUntilt = splitext(fnUntilt)[0]+'_filtered_resized.xmd'
+            fnTilt = splitext(fnTilt)[0]+'_filtered_resized.xmd'
+            maskId = self._insertFunctionStep('mask2InputParticles', fnUntilt, fnTilt, prerequisites=[filteresId])
+        else:
+            maskId = self._insertFunctionStep('mask2InputParticles', fnUntilt, fnTilt, prerequisites=[convertId])
+        
+        print '--------------------------------------------'
+        print '--------------------------------------------'
+        print '--------------------------------------------'
+        print '--------------------------------------------'
+        print fnUntilt
+        print fnTilt
+#         #TODO: resize output volume 
         for k in range(1, int(self.iterations.get())+1):
-             
             self._insertFunctionStep('angularTiltAssignmentStep', fnUntilt, fnTilt, fnmic, k, prerequisites=[maskId])
             self._insertFunctionStep('ReconstructFourierStep', k)
- 
-         
+# 
+# 
         self._insertFunctionStep('createOutputStep')
-# #                 
+        
+    def filterResizeStep(self, Xdim, fnUntilt, fnTilt):
+        ##
+        fnUntilt_Noext = splitext(fnUntilt)[0]
+        fnTilt_Noext = splitext(fnTilt)[0]
+        
+        fnUntilt_fil_stk = fnUntilt_Noext+'_filtered.stk'
+        fnTilt_fil_stk = fnTilt_Noext+'_filtered.stk'
+        ##
+        
+        fnUntilt_ReducedNoExt = splitext(fnUntilt_fil_stk)[0]
+        fnTilt_ReducedNoExt = splitext(fnTilt_fil_stk)[0]
+        
+        maxFreq = self.maxFreq.get()
+        inputSet = self.tilpairparticles.get().getUntilted()
+        ts = inputSet.getSamplingRate()
+        K = 0.25 * (maxFreq / ts)
+        if K < 1:
+            K = 1
+        self.Xdim2 = Xdim / K
+        if self.Xdim2 < 32:
+            self.Xdim2 = 32
+            K = self.Xdim / self.Xdim2
+        freq = ts / maxFreq
+        ts = K * ts
+
+        paramsfilterU  =  ' -i %s' % fnUntilt
+        paramsfilterU +=  ' -o %s'% fnUntilt_fil_stk
+        paramsfilterU +=  ' --fourier low_pass %f' % freq
+        paramsfilterU +=  ' --keep_input_columns'
+        paramsfilterU +=  ' --save_metadata_stack'
+        
+        paramsfilterT  =  ' -i %s' % fnTilt
+        paramsfilterT +=  ' -o %s'% fnTilt_fil_stk
+        paramsfilterT +=  ' --fourier low_pass %f' % freq
+        paramsfilterT +=  ' --keep_input_columns'
+        paramsfilterT +=  ' --save_metadata_stack'
+        
+        paramsResizeU  =  ' -i %s' % fnUntilt_ReducedNoExt+'.xmd'
+        paramsResizeU +=  ' --fourier %d' % self.Xdim2
+        paramsResizeU +=  ' -o %s' % fnUntilt_ReducedNoExt+'_resized.stk'
+        paramsResizeU +=  ' --keep_input_columns'
+        paramsResizeU +=  ' --save_metadata_stack'
+         
+        paramsResizeT  =  ' -i %s' % fnTilt_ReducedNoExt+'.xmd'
+        paramsResizeT +=  ' --fourier %d' % self.Xdim2
+        paramsResizeT +=  ' -o %s' % fnTilt_ReducedNoExt+'_resized.stk'
+        paramsResizeT +=  ' --keep_input_columns'
+        paramsResizeT +=  ' --save_metadata_stack'
+         
+        paramsResizeVol  =  ' -i %s' % self._getExtraPath('init_vol.vol')
+        paramsResizeVol +=  ' --fourier %d' % self.Xdim2
+        paramsResizeVol +=  ' -o %s' % self._getExtraPath('init_vol.vol')
+        paramsResizeVol +=  ' --keep_input_columns'
+        paramsResizeVol +=  ' --save_metadata_stack'
+        
+        self.runJob('xmipp_transform_filter',paramsfilterU)
+        self.runJob('xmipp_transform_filter',paramsfilterT)
+        self.runJob('xmipp_image_resize',paramsResizeU)
+        self.runJob('xmipp_image_resize',paramsResizeT)
+        if self.thereisRefVolume.get() == True:
+            self.runJob('xmipp_image_resize',paramsResizeVol)
+
+        
+
     def mask2InputParticles(self, fnUntilt, fnTilt):
-        xdim = self.tilpairparticles.get().getUntilted().getDimensions()[0]
+        if self.Resizing.get() == True:
+            fnUntiltStk = splitext(fnUntilt)[0]+'.stk'
+            xdim, _, _, _ = em.ImageHandler().getDimensions(fnUntiltStk)
+        else:
+            xdim = self.tilpairparticles.get().getUntilted().getDimensions()[0]
+        
         maskArgs = "-i %s --mask circular %d -v 0" % (fnUntilt, -xdim/2)
         self.runJob('xmipp_transform_mask', maskArgs, numberOfMpi=1)
         maskArgs = "-i %s --mask circular %d -v 0" % (fnTilt, -xdim/2)
+        self.runJob('xmipp_transform_mask', maskArgs, numberOfMpi=1)
+        maskArgs = "-i %s --mask circular %d -v 0" % (self._getExtraPath('init_vol.vol'), -xdim/2)
         self.runJob('xmipp_transform_mask', maskArgs, numberOfMpi=1)
 
 
@@ -199,33 +293,20 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
         md_u_all.write(path_u_all)
         md_t_all.write(path_t_all)
         
-
-
-
-#     def downsamplingStep(self, images2resize):
-#        
-#         params =  '  -i %s ' % images2resize
-#         params += '  --factor %f ' % self.downsamplingfactor.get()
-#         params += '  --oroot %s ' %self._getExtraPath()
-# 
-#         self.runJob('xmipp_image_resize', params)
-
+        if self.thereisRefVolume.get() is True:
+            volume_init = self.initvolume.get().getFileName()
+            copyfile(volume_init,self._getExtraPath('init_vol.vol'))
+        
    
     def angularTiltAssignmentStep(self, fnUntilt, fnTilt, fnmic, iter_num):
         
 
         if iter_num is 1:
             if self.thereisRefVolume.get() is True:
-                volume_init = self.initvolume.get().getFileName()
-                print '-------------------------'
-                print volume_init
-                print '-------------------------'
-                copyfile(volume_init,self._getExtraPath('init_vol.vol'))
                 volume_init = self._getExtraPath('init_vol.vol')
-                print volume_init
-                xdim = self.tilpairparticles.get().getUntilted().getDimensions()[0]
-                maskArgs = "-i %s --mask circular %d -v 0" % (volume_init, -xdim/2)
-                self.runJob('xmipp_transform_mask', maskArgs, numberOfMpi=1)
+#                 xdim = self.tilpairparticles.get().getUntilted().getDimensions()[0]
+#                 maskArgs = "-i %s --mask circular %d -v 0" % (volume_init, -xdim/2)
+#                 self.runJob('xmipp_transform_mask', maskArgs, numberOfMpi=1)
             else:
                 volume_init = ''
         else:
@@ -261,7 +342,6 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
 
     
     def createOutputStep(self):
-        
         #Output Volume
         lastIter = self.iterations.get()
         
@@ -274,10 +354,26 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
         
         self._defineOutputs(outputVolume=volumesSet)
         self._defineSourceRelation(self.tilpairparticles, volumesSet)
+        
+        #################################################################
+        USet = self._createSetOfParticles("Untilted")
+        Upath = self._getExtraPath('all_untilted_particles_input_angular_assignment_lastiter.xmd')
+        readSetOfParticles(Upath, USet)
+        USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
+        self._defineOutputs(outputParticles=USet)
+        self._defineSourceRelation(self.tilpairparticles.get().getUntilted(), USet)
+       
+               
+        TSet = self._createSetOfParticles("Tilted")
+        Tpath = self._getExtraPath('all_tilted_particles_input_angular_assignment_lastiter.xmd')
+        readSetOfParticles(Tpath, TSet)
+        TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
+        self._defineOutputs(outputParticles=TSet)
+        self._defineSourceRelation(self.tilpairparticles.get().getTilted(), TSet)
 
 
     def getIterVolume(self, iterNumber):
-        return self._getExtraPath('volume_iter_%03d.vol' % iterNumber)   
+        return self._getExtraPath('volume_iter_%03d.vol' % iterNumber)
         
     #--------------------------- INFO functions -------------------------------------------- 
     def _validate(self):

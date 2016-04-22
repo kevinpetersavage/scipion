@@ -253,7 +253,9 @@ void ProgAngularTiltPairAssignment::run()
 	if (fnVol =="")
 	{
 		if (rank == 0)
+		{
 		generateInitialBall(mduntilt_exp, mdtilt_exp, md_u_assign_iter0, md_t_assign_iter0, fnVol);
+		}
 	}
 	synchronize();
 
@@ -586,8 +588,8 @@ void ProgAngularTiltPairAssignment::run()
 
 		fnall_md = formatString("particles@%s/All_angular_assignment_lastiter.xmd", fnDir.c_str());
 		md_union.write(fnall_md);
-		mduntilt_output.write((String) filnm_md_u);
-		mdtilt_output.write((String) filnm_md_t);
+		mdu_all.write(filnm_md_u);
+		mdt_all.write(filnm_md_t);
 		}
 		synchronize();
 }
