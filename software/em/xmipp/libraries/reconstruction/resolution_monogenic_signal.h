@@ -31,7 +31,7 @@
 #include <data/xmipp_program.h>
 #include <data/xmipp_image.h>
 #include <data/metadata.h>
-//#include <data/xmipp_fft.h>
+#include <data/xmipp_fft.h>
 #include <data/xmipp_fftw.h>
 #include <math.h>
 #include <limits>
@@ -47,23 +47,37 @@ class ProgMonogenicSignalRes : public XmippProgram
 {
 public:
 	 /** Filenames */
-	FileName fnUntilt, fnTilt, fnDir, fnVol;
+	FileName fnDir, fnVol, fnMask;
 
-	/** sampling rate*/
-	double ang_dist, ang_acc;
+	/** Filter type */
+	double fType, smpr;
 
-	/** number of classes*/
-	int N_cls;
+	/** Is the volume previously masked?*/
+	bool condpremask;
+
 public:
 
     void defineParams();
     void readParams();
     void filterVolume();
-    void RieszTransform3Dreal(const MultidimArray<double> &inputVol, std::vector<MultidimArray< std::complex<double> > > &RieszVector);
-    void amplitudeMonogenicSignal(const MultidimArray<double> &inputVol,
-			  	  	  	  	  	  const std::vector<MultidimArray< std::complex<double> > > &RieszVector,
+    void RieszTransform3Dreal(const MultidimArray<double> &inputVol, std::vector<MultidimArray<double> > &RieszVector);
+    void amplitudeMonogenicSignal3D(const MultidimArray<double> &inputVol,
+			  	  	  	  	  	  const std::vector<MultidimArray<double> > &RieszVector,
 			  	  	  	  	  	  	  	  	  	  	  MultidimArray<double> &amplitude);
-    void passbandfiltervol(const MultidimArray<double> &inputVol, double freq, MultidimArray<double> &filteredVol, double FWHM=0.05);
+    void passbandfiltervol(const MultidimArray<double> &inputVol, double freq, MultidimArray<double> &filteredVol, double sigma = 1);
+
+    void passbandfiltervolFourier(const MultidimArray<double> &inputVol, MultidimArray< std::complex<double> > fftVol,
+			double freq, MultidimArray< std::complex<double> > fftVfiltered_vol, double sigma);
+
+    void highpassfiltervol(const MultidimArray<double> &inputVol, double freq, MultidimArray<double> &filteredVol, double raised_w);
+
+    void FourierAmplitudeMonogenicSignal3D(const MultidimArray<double> &inputVol, const std::vector<MultidimArray<double> > &RieszVector,
+    											MultidimArray<double> &amplitude, MultidimArray< std::complex<double> > &fftamplitude);
+
+    void medianFilter3x3x3(const MultidimArray<double> &inputVol, MultidimArray<double> &FilteredVol);
+
+    void applymask(const MultidimArray<double> &amplitudeMS, const MultidimArray<double> &mask, MultidimArray<double> &mask_amplitudeMS);
+
     void run();
 
 };
