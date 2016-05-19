@@ -37,7 +37,8 @@
 #include <math.h>
 #include <limits>
 #include <complex>
-#define DEBUG
+//#define DEBUG
+//#define MAJORIZATION
 
 
 void ProgMonogenicSignalRes::readParams()
@@ -360,7 +361,13 @@ void ProgMonogenicSignalRes::run()
 	//applymask(p2amplitudeMS_original, p2mask, mask_amplitudeMS_original);
 	/////////////
 
-
+	#ifdef MAJORIZATION
+	FileName fnmask;
+	Image<double> save_aux;
+	fnmask = formatString("./masked_MS.vol");
+	save_aux = p2mask;
+	save_aux.write(fnmask);
+	#endif
 
 	std::cout << "Analysing frequencies..." << std::endl;
 	std::cout << "Sampling rate = " << smpr << std::endl;
@@ -384,11 +391,27 @@ void ProgMonogenicSignalRes::run()
 			}
 		}
 
+		#ifdef MAJORIZATION
+			std::cout << "majorization..." << std::endl;
+		#endif
+
 		RieszTransform3Dreal(filteredVol[idx_freq], RieszVector);
 
 		amplitudeMonogenicSignal3D(filteredVol[idx_freq], RieszVector, p2amplitudeMS);
 
 		applymask(p2amplitudeMS, p2mask, mask_amplitudeMS);
+
+		#ifdef MAJORIZATION
+		FileName fn_MGS;
+		Image<double> save_aux;
+		fn_MGS = formatString("./MS_freq_%i.vol",idx_freq);
+		//fnmask = formatString("./masked_MS_freq_%i.vol",idx_freq);
+		save_aux = p2amplitudeMS;
+		save_aux.write(fn_MGS);
+		//save_aux = p2mask;
+		//save_aux.write(fnmask);
+
+		#endif
 
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(p2amplitudeMS)
 		{
