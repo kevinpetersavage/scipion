@@ -101,10 +101,10 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
                       label="Symmetry",  
                       help='Symmetry group. By default = c1')
         
-        form.addParam('downsamplingfactor', FloatParam, default=0.4, expertLevel=LEVEL_ADVANCED,
-                      label="Downsampling factor",  
-                      help='The images are downsampled in order to speed up the process'
-                      'by default = 0.4')
+#         form.addParam('downsamplingfactor', FloatParam, default=0.4, expertLevel=LEVEL_ADVANCED,
+#                       label="Downsampling factor",  
+#                       help='The images are downsampled in order to speed up the process'
+#                       'by default = 0.4')
         
         form.addParam('maxFreq', IntParam, default=12, expertLevel=LEVEL_ADVANCED,
                       label='Max frequency of the initial volume',
