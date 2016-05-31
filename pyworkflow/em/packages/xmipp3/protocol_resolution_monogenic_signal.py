@@ -86,20 +86,16 @@ class XmippProtResolutionMonogenicSignal(ProtRefine3D):
         """ Read the input volume.
         """
         # Get the converted input micrographs in Xmipp format
-        print 'converting...'
+
         path_vol = self._getExtraPath() + '/input_volume.vol'
-        print 'converting...'
         vol_ = self.inputVolume.get().getFileName()
-        print 'converting...'
-        print vol_
         copyfile(vol_,path_vol)
-        print 'converting...'
    
     def resolutionMonogenicSignalStep(self, fnVol):
 
         params =  ' --vol %s' % fnVol
         params +=  ' --mask %s' % self.Mask.get().getFileName()
-        params +=  ' --odir %s' % self._getExtraPath('outputresolution.vol')
+        params +=  ' --odir %s' % self._getExtraPath()
         params +=  ' --filter_type %f' % float(self.filterType.get())
         params +=  ' --sampling_rate %f' % self.inputVolume.get().getSamplingRate()
         if self.premask.get() is True:
@@ -109,7 +105,7 @@ class XmippProtResolutionMonogenicSignal(ProtRefine3D):
         self.runJob('xmipp_resolution_monogenic_signal', params)
     
     def createOutputStep(self):
-        volume_path = self._getExtraPath('outputresolution.vol')
+        volume_path = self._getExtraPath('MGresolution.vol')
         
         volumesSet = self._createSetOfVolumes()
         volumesSet.setSamplingRate(self.inputVolume.get().getSamplingRate())
