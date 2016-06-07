@@ -146,7 +146,7 @@ class XmippProtAddNoise(ProtRefine3D):
     def createOutputStep(self):
         #Output Volume
         
-        fnOutVol = self._getExtraPath('init_vol.vol')
+        fnOutVol = self._getExtraPath('Noisy_volume.vol')
         
         volumesSet = self._createSetOfVolumes()
         volumesSet.setSamplingRate( self.input.get().getSamplingRate() )
