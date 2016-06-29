@@ -207,7 +207,10 @@ class Object(object):
     def getObjCreation(self):
         """ Return the stored creation time of the object. """
         return self._objCreation
-    
+
+    def getObjectCreationAsDate(self):
+        """ Return the stored creation time of the object as date """
+
     def strId(self):
         """String representation of id"""
         return str(self._objId)
@@ -434,7 +437,7 @@ class Object(object):
         # Split in possible tokens
         import re
         tokens = re.split('\W+', condition)
-        condStr = condition 
+        condStr = condition
         
         for t in tokens:
             if self.hasAttribute(t):
@@ -808,14 +811,16 @@ class List(Object, list):
     
     def _stringToIndex(self, strIndex):
         """ From the string index representation obtain the index.
-        For simetry the number in the index string will be 
+        For symetry the number in the index string will be
         decreased in 1.
         """
         return int(strIndex.split(self.ITEM_PREFIX)[1]) - 1
             
-    #TODO: check if needed
     def __len__(self):
         return list.__len__(self)
+
+    def getSize(self): # Just to have similar API than Set
+        return len(self)
     
     def isEmpty(self):
         return len(self) == 0
@@ -865,8 +870,7 @@ class CsvList(Scalar, list):
         self._pType = pType
         
     def _convertValue(self, value):
-        """Value should be a str with comman separated values
-        or a list.
+        """ Value should be a str with comma separated values or a list.
         """
         self.clear()
         if value:
@@ -1144,4 +1148,16 @@ def ObjectWrap(value):
     # If it is str, unicode or unknown type, convert to string
     return String(value)
          
-           
+
+class Dict(dict):
+    """ Simple wrapper around dict class to have a default value. """
+    def __init__(self, default=None):
+        self._default = default
+        dict.__init__(self)
+
+    def __getitem__(self, key):
+        """ Get the image with the given id. """
+        return self.get(key, self._default)
+
+    def __contains__(self, item):
+        return True
