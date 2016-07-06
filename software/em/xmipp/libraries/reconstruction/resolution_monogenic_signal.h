@@ -78,6 +78,9 @@ public:
 
     void applymask(const MultidimArray<double> &amplitudeMS, const MultidimArray<double> &mask, MultidimArray<double> &mask_amplitudeMS);
 
+    void getHalfDimensions(const  MultidimArray<double> &Vol, size_t &xdim, size_t &ydim, size_t &zdim);
+
+    double calculateMaskRadius(const MultidimArray<double> &Vol, size_t &xdim, size_t &ydim, size_t &zdim);
     void run();
 
 };
