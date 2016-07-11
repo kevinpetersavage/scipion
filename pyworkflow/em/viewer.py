@@ -50,6 +50,7 @@ import xmipp
 from data import PdbFile
 
 from viewer_fsc import FscViewer
+from viewer_pdf import PDFReportViewer
 
 #------------------------ Some common Views ------------------
 
@@ -217,12 +218,13 @@ class Classes3DView(ClassesView):
 
 class CoordinatesObjectView(DataView):
     """ Wrapper to View but for displaying Scipion objects. """
-    def __init__(self, project, path, outputdir, protocol, pickerProps=None, viewParams={}, **kwargs):
+    def __init__(self, project, path, outputdir, protocol, pickerProps=None, inTmpFolder=False, **kwargs):
         DataView.__init__(self, path, **kwargs)
         self.project = project
         self.outputdir = outputdir
         self.protocol = protocol
         self.pickerProps = pickerProps
+        self.inTmpFolder = inTmpFolder
         
 #     def getShowJParams(self):
 #         params = '--input %s --output %s --mode %s'%(self._path, self.outputdir, self.mode)
@@ -230,7 +232,7 @@ class CoordinatesObjectView(DataView):
     
     def show(self):
         #showj.runJavaIJapp(self._memory, 'xmipp.viewer.particlepicker.training.SupervisedPickerRunner', self.getShowJParams(), env=self._env)
-        return showj.launchSupervisedPickerGUI(self._path, self.outputdir, self.protocol, pickerProps=self.pickerProps)
+        return showj.launchSupervisedPickerGUI(self._path, self.outputdir, self.protocol, pickerProps=self.pickerProps, inTmpFolder=self.inTmpFolder)
         
         
 class ImageView(View):
@@ -315,6 +317,7 @@ class ChimeraViewer(Viewer):
         else:
             raise Exception('ChimeraViewer.visualize: can not visualize class: %s' % obj.getClassName())
 
+
 class ChimeraClient:
     
     def __init__(self, volfile, sendEnd=True,**kwargs):
@@ -391,6 +394,7 @@ class ChimeraClient:
     def answer(self, msg):
         if msg == 'exit_server':
             self.listen = False
+
 
 class ChimeraAngDistClient(ChimeraClient):
 
@@ -695,4 +699,3 @@ class VmdViewer(Viewer):
             # the first approach is better 
         else:
             raise Exception('VmdViewer.visualize: can not visualize class: %s' % obj.getClassName())     
-        

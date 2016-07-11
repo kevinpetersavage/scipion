@@ -173,6 +173,10 @@ Image_getDimensions(PyObject *obj, PyObject *args, PyObject *kwargs);
 
 /* Return image dimensions as a tuple */
 PyObject *
+Image_resetOrigin(PyObject *obj, PyObject *args, PyObject *kwargs);
+
+/* Return image dimensions as a tuple */
+PyObject *
 Image_getEulerAngles(PyObject *obj, PyObject *args, PyObject *kwargs);
 
 /* Return value from MainHeader*/
