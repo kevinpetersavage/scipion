@@ -3119,7 +3119,10 @@ void MedianFilter::apply(MultidimArray<double> &img)
 {
     static MultidimArray<double> tmp;
     tmp = img;
-    medianFilter3x3(tmp, img);
+    if (ZSIZE(img)==1)
+    	medianFilter3x3(tmp, img);
+    else if (ZSIZE(img)>1)
+    	medianFilter3x3x3(tmp, img);
 }
 
 /** Define the parameters for use inside an Xmipp program */

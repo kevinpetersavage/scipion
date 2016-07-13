@@ -26,7 +26,7 @@
 
 from itertools import izip
 
-from pyworkflow.protocol.params import (PointerParam, EnumParam, BooleanParam)
+from pyworkflow.protocol.params import (PointerParam, EnumParam, BooleanParam, FloatParam, LEVEL_ADVANCED)
 from pyworkflow.em.protocol.protocol_3d import ProtRefine3D
 from pyworkflow.em.data import Volume
 from convert import readSetOfVolumes
@@ -35,11 +35,11 @@ from shutil import copyfile
 
 
 
-class XmippProtResolutionMonogenicSignal(ProtRefine3D):
+class XmippProtMonoRes(ProtRefine3D):
     """    
     Given a map the protocol assings local resolutions to each pixel of the map.
     """
-    _label = 'resolution monogenic signal'
+    _label = 'MonoRes - Monogenic Resolution'
     
     def __init__(self, *args, **kwargs):
         ProtRefine3D.__init__(self, *args, **kwargs)
@@ -54,14 +54,30 @@ class XmippProtResolutionMonogenicSignal(ProtRefine3D):
                       help='Select a volume for determining its local resolucion.')
         
         form.addParam('Mask', PointerParam, label="Mask", pointerClass='VolumeMask', allowsNull=True,
-                      help='The mask values must be between 0 (remove these pixels) and 1 (let them pass)')
+                      help='The mask determines the those points of the sphere where the macromolecle is')
+
+        line = form.addLine('Resolution Range (A)', 
+                      help="If the user knows the range of resolutions or only a"
+                      " range of frequency needs to be analysed", expertLevel=LEVEL_ADVANCED)
+        line.addParam('minRes', FloatParam, default=1, label='Min')
+        line.addParam('maxRes', FloatParam, default=100, label='Max')
         
-        form.addParam('filterType', EnumParam, label='Filter Type', 
-                      choices=['pass band','high pass'], default=0)
+        form.addParam('freqStep', FloatParam, label="Frequency Step",  default=0.01, expertLevel=LEVEL_ADVANCED,
+                      help='The resolution is computed at frequencies between 0 and 0.5 px/A. this parameter determines'
+                      'the sweep step')
         
         form.addParam('premask', BooleanParam, default=False,
-                      label="Is the volume masked",   
-                      help='yes if the volume is masked. No otherwise')
+                      label="Is the volume in a circular mask?",
+                      help='Sometimes the volume is in an sphere, then this option ought to be selected')
+        form.addParam('circularRadius', FloatParam, label="Radius Circular Mask",  condition = 'premask', 
+                      default=50, 
+                      help='This is the radius of the circular mask.')
+
+#         form.addParam('gaussianfilter', FloatParam, label="Variance Gaussian filter",  default=0.5, expertLevel=LEVEL_ADVANCED,
+#                       help='The map of resolution is filtered by means of a gaussian filter with' 
+#                       'standard deviation provided by this parameter.')
+        
+        
 
         form.addParallelSection(threads=1, mpi=1)
 
@@ -77,9 +93,11 @@ class XmippProtResolutionMonogenicSignal(ProtRefine3D):
                  
         fnVol = self._getExtraPath('input_volume.vol')
 
-        self._insertFunctionStep('resolutionMonogenicSignalStep', fnVol, prerequisites=[convertId])
+        MS = self._insertFunctionStep('resolutionMonogenicSignalStep', fnVol, prerequisites=[convertId])
         
-        self._insertFunctionStep('createOutputStep', prerequisites=[convertId])
+        #FilterSt = self._insertFunctionStep('medianFilterStep',  prerequisites=[MS])
+        
+        self._insertFunctionStep('createOutputStep', prerequisites=[MS])
        
 
     def convertInputStep(self):
@@ -95,14 +113,25 @@ class XmippProtResolutionMonogenicSignal(ProtRefine3D):
 
         params =  ' --vol %s' % fnVol
         params +=  ' --mask %s' % self.Mask.get().getFileName()
-        params +=  ' --odir %s' % self._getExtraPath()
-        params +=  ' --filter_type %f' % float(self.filterType.get())
+        params +=  ' -o %s' % self._getExtraPath('MGresolution.vol')
         params +=  ' --sampling_rate %f' % self.inputVolume.get().getSamplingRate()
+        
+        params +=  ' --stepW %f' % self.freqStep.get()
+        params +=  ' --minRes %f' % self.minRes.get()
+        params +=  ' --maxRes %f' % self.maxRes.get()
         if self.premask.get() is True:
-            params +=  ' --premask'
+            params +=  ' --circular_mask %f' % self.circularRadius.get()
 
 
         self.runJob('xmipp_resolution_monogenic_signal', params)
+        
+#     def medianFilterStep(self):
+# 
+#         params =  ' -i %s' % self._getExtraPath('MGresolution.vol')
+#         params +=  ' --median'
+#         params +=  ' -o %s' % self._getExtraPath('outputresolution.vol')
+# 
+#         self.runJob('xmipp_transform_filter', params)
     
     def createOutputStep(self):
         volume_path = self._getExtraPath('MGresolution.vol')

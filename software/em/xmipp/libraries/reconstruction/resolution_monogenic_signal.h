@@ -36,9 +36,9 @@
 #include <math.h>
 #include <limits>
 #include <complex>
+#include "fourier_filter.h"
 
-
-/**@defgroup SSNR resolution_ssnr (Spectral Signal to Noise Ratio)
+/**@defgroup Monogenic Resolution
    @ingroup ReconsLibrary */
 //@{
 /** SSNR parameters. */
@@ -47,42 +47,41 @@ class ProgMonogenicSignalRes : public XmippProgram
 {
 public:
 	 /** Filenames */
-	FileName fnDir, fnVol, fnMask;
+	FileName fnOut, fnVol, fnMask;
 
-	/** Filter type */
-	double fType, smpr;
+	/** sampling rate, minumum resolutoin, and maximum resolution */
+	double sampling, minRes, maxRes;
 
 	/** Is the volume previously masked?*/
-	bool condpremask;
+	int R;
 
+	/** Step in digital frequency */
+	double stepW;
 public:
 
     void defineParams();
     void readParams();
-    void filterVolume();
-    void RieszTransform3Dreal(const MultidimArray<double> &inputVol, std::vector<MultidimArray<double> > &RieszVector);
-    void amplitudeMonogenicSignal3D(const MultidimArray<double> &inputVol,
-			  	  	  	  	  	  const std::vector<MultidimArray<double> > &RieszVector,
-			  	  	  	  	  	  	  	  	  	  	  MultidimArray<double> &amplitude);
-    void passbandfiltervol(const MultidimArray<double> &inputVol, double freq, MultidimArray<double> &filteredVol, double sigma = 1);
+    void produceSideInfo();
 
-    void passbandfiltervolFourier(const MultidimArray<double> &inputVol, MultidimArray< std::complex<double> > fftVol,
-			double freq, MultidimArray< std::complex<double> > fftVfiltered_vol, double sigma);
+    /* Mogonogenid amplitud of a volume, given an input volume,
+     * the monogenic amplitud is calculated and low pass filtered at frequency w1*/
+    void amplitudeMonogenicSignal3D(double w1, MultidimArray<double> &amplitude);
 
-    void highpassfiltervol(const MultidimArray<double> &inputVol, double freq, MultidimArray<double> &filteredVol, double raised_w);
+    /* Median filter of an input volume, m, the output volume is the multdimArray out,
+     * if the median is lesser than the threshold, then the output values is the own
+     * threshold. Ohterwise, the output value is the median*/
+    void medianFilter3x3x3Thresholding(MultidimArray<double> &m, MultidimArray<double> &out, double threshold);
 
-    void FourierAmplitudeMonogenicSignal3D(const MultidimArray<double> &inputVol, const std::vector<MultidimArray<double> > &RieszVector,
-    											MultidimArray<double> &amplitude, MultidimArray< std::complex<double> > &fftamplitude);
-
-    void medianFilter3x3x3(const MultidimArray<double> &inputVol, MultidimArray<double> &FilteredVol);
-
-    void applymask(const MultidimArray<double> &amplitudeMS, const MultidimArray<double> &mask, MultidimArray<double> &mask_amplitudeMS);
-
-    void getHalfDimensions(const  MultidimArray<double> &Vol, size_t &xdim, size_t &ydim, size_t &zdim);
-
-    double calculateMaskRadius(const MultidimArray<double> &Vol, size_t &xdim, size_t &ydim, size_t &zdim);
     void run();
 
+public:
+    Image<int> mask;
+    MultidimArray<double> iu, VRiesz; // Inverse of the frequency
+	MultidimArray< std::complex<double> > fftV; // Fourier transform of the input volume
+	FourierTransformer transformer_inv;
+	MultidimArray< std::complex<double> > fftVRiesz;
+	FourierFilter lowPassFilter;
+	double NS, NN; // Number of elements inside the signal and in the noise
 };
 //@}
 #endif

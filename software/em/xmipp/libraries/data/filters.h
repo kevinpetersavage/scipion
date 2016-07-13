@@ -1257,6 +1257,37 @@ void medianFilter3x3(MultidimArray< T >&m, MultidimArray< T >& out)
     STARTINGY(m) = STARTINGY(out) = backup_startingy;
 }
 
+/** Median filter for volumes.
+ * Only the face connected voxels are sorted in order to save time.
+ */
+template <typename T>
+void medianFilter3x3x3(MultidimArray< T >&m, MultidimArray< T >& out)
+{
+	double values[6];
+
+	for (size_t k = 1; k<(ZSIZE(m)-1); k++)
+	{
+	  for (size_t i= 1; i<(YSIZE(m)-1); i++)
+	  {
+		for (size_t j= 1; j<(XSIZE(m)-1); j++)
+		{
+		  values[0] = A3D_ELEM(m, k-1, i, j);
+		  values[1] = A3D_ELEM(m, k+1, i, j);
+		  values[2] = A3D_ELEM(m, k, i-1, j);
+		  values[3] = A3D_ELEM(m, k, i+1, j);
+		  values[4] = A3D_ELEM(m, k, i, j-1);
+		  values[5] = A3D_ELEM(m, k, i, j+1);
+
+		  std::sort(values, values+6);
+
+		  A3D_ELEM(out, k, i, j) = 0.5* (values[2] + values[3]);
+		}
+	  }
+	}
+
+}
+
+
 /** Mumford-Shah smoothing
  * @ingroup Filters
  *
