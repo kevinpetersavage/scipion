@@ -1,4 +1,4 @@
-# **************************************************************************
+# *****************************************************************************
 # *
 # * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
 # *              Laura del Cano (ldelcano@cnb.csic.es)
@@ -26,23 +26,26 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'jmdelarosa@cnb.csic.es'
 # *
-# **************************************************************************
+# *****************************************************************************
 
 from glob import glob
 from os.path import exists, basename
 
 import pyworkflow.em.metadata as md
-from pyworkflow.object import String, Float
-from pyworkflow.em.packages.xmipp3.constants import SAME_AS_PICKING, OTHER, ORIGINAL
-from pyworkflow.protocol.constants import STEPS_PARALLEL, LEVEL_ADVANCED, STATUS_FINISHED
-from pyworkflow.protocol.params import (PointerParam, EnumParam, FloatParam, IntParam, 
-                                        BooleanParam, RelationParam, Positive)
+from pyworkflow.em.packages.xmipp3.constants import (SAME_AS_PICKING, OTHER,
+                                                     ORIGINAL)
+from pyworkflow.protocol.constants import (STEPS_PARALLEL, LEVEL_ADVANCED,
+                                           STATUS_FINISHED)
+from pyworkflow.protocol.params import (PointerParam, EnumParam, FloatParam,
+                                        IntParam, BooleanParam, RelationParam,
+                                        Positive)
 from pyworkflow.em.protocol import  ProtExtractParticles
 from pyworkflow.em.data import SetOfParticles
 from pyworkflow.em.constants import RELATION_CTF
 from pyworkflow.utils.path import removeBaseExt, replaceBaseExt, moveFile
 
-from convert import writeSetOfCoordinates, readSetOfParticles, micrographToCTFParam
+from convert import (writeSetOfCoordinates, readSetOfParticles,
+                     micrographToCTFParam)
 from xmipp3 import XmippProtocol
 
 # Rejection method constants
@@ -50,7 +53,7 @@ REJECT_NONE = 0
 REJECT_MAXZSCORE = 1
 REJECT_PERCENTAGE = 2
 
-                
+
 class XmippProtExtractParticles(ProtExtractParticles, XmippProtocol):
     """Protocol to extract particles from a set of coordinates"""
     _label = 'extract particles'
@@ -58,30 +61,32 @@ class XmippProtExtractParticles(ProtExtractParticles, XmippProtocol):
     def __init__(self, **args):
         ProtExtractParticles.__init__(self, **args)
         self.stepsExecutionMode = STEPS_PARALLEL
-        
-    #--------------------------- DEFINE param functions --------------------------------------------   
+    
+    #--------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
         
-        form.addParam('inputCoordinates', PointerParam, pointerClass='SetOfCoordinates', 
+        form.addParam('inputCoordinates', PointerParam,
+                      pointerClass='SetOfCoordinates',
                       important=True,
                       label="Input coordinates",
                       help='Select the SetOfCoordinates ')
         
         # Note: even if you have changed the label to 'Micrograph source' we will keep
         # the param name as 'downsampleType' for compatibility with previous executions
-        form.addParam('downsampleType', EnumParam, choices=['same as picking', 'other'], default=0,
-                      important=True, 
-                      label='Micrographs source', display=EnumParam.DISPLAY_HLIST, 
+        form.addParam('downsampleType', EnumParam,
+                      choices=['same as picking', 'other'], default=0,
+                      important=True, label='Micrographs source',
+                      display=EnumParam.DISPLAY_HLIST, 
                       help='By default the particles will be extracted \n'
                            'from the micrographs used in the picking \n'
                            'step ( _same as picking_ option ). \n'
                            'If select option _other_, you must provide \n'
                            'a different set of micrographs to extract from.\n'
                            '*Note*: In the _other_ case, ensure that provided \n'
-                           'micrographs and coordinates micrographs are related \n'
-                           'by micName or by micId.')
-
+                           'micrographs and coordinates micrographs are \n'
+                           'related by micName or by micId.')
+        
         form.addParam('inputMicrographs', PointerParam, 
                       pointerClass='SetOfMicrographs',
                       condition='downsampleType != 0',
@@ -89,7 +94,8 @@ class XmippProtExtractParticles(ProtExtractParticles, XmippProtocol):
                       label="Input micrographs", 
                       help='Select the SetOfMicrographs from which to extract.')
         
-        form.addParam('downFactor', FloatParam, default=1, condition='downsampleType==1',
+        form.addParam('downFactor', FloatParam, default=1,
+                      condition='downsampleType==1',
                       label='Downsampling factor',
                       help='This factor is always referred to the SetOfMicrographs '
                       'from which we will extract the particles. '
@@ -430,25 +436,50 @@ class XmippProtExtractParticles(ProtExtractParticles, XmippProtocol):
         self._defineSourceRelation(self.inputCoordinates, imgSet)
         if self.ctfRelations.hasValue():
             self._defineSourceRelation(self.ctfRelations.get(), imgSet)
-
-    #--------------------------- INFO functions -------------------------------------------- 
+    
+    #--------------------------- INFO functions -------------------------------
     def _validate(self):
         errors = []
         
-        # doFlip can only be True if CTF information is available on picked micrographs
-        if self.doFlip and not self.ctfRelations.hasValue():
-            errors.append('Phase flipping cannot be performed unless CTF information is provided.')
+        if self.ctfRelations.hasValue():
+            self._setupCtfProperties() # setup self.micKey among others
+            if self.micKey is None:
+                errors.append('Some problem occurs matching micrographs and \n'
+                              'CTF. There were micrographs for which CTF was\n'
+                              ' not found either using micName or micId.\n')
+            mics = self.getInputMicrographs()
+            proj = self.getProject()
+            
+            for pobj in proj.getRelatedObjects(RELATION_CTF, mics):
+                print "POBJ2: ", pobj.get().getObjId()
 
+            
+            
+#             ctfRelationList = proj.getRelatedObjects(RELATION_CTF, self.ctfRelations.get())
+#             print "ctfRelationList", ctfRelationList
+#             mapper = self.getMapper()
+#             ctfRelationList = mapper.getRelationChilds(RELATION_CTF, mics)
+#             ctfRelationList2 = mapper.getRelationParents(RELATION_CTF, mics)
+#             print "ctfRelationList", ctfRelationList, ctfRelationList2
+#             hasRelation = False
+#             for ctfPointer in ctfRelationList:
+#                 ctfRelatedId = ctfPointer.get().getObjId()
+#                 ctfObjId = self.ctfRelations.get().getObjId()
+#                 if ctfRelatedId == ctfObjId:
+#                     hasRelation = True
+#             if not hasRelation:
+#                 errors.append("the set of CTFs has not any relation with "
+#                               "the micrographs")
+        else:
+            # doFlip can only be True if CTF information is available on
+            # picked micrographs
+            if self.doFlip:
+                errors.append('Phase flipping cannot be performed unless CTF '
+                              'information is provided.')
         if self.doNormalize:
             if self.backRadius > int(self.boxSize.get()/2):
                 errors.append("Background radius for normalization should be "
                               "equal or less than half of the box size.")
-
-        self._setupCtfProperties() # setup self.micKey among others
-        if self.ctfRelations.hasValue() and self.micKey is None:
-            errors.append('Some problem occurs matching micrographs and CTF.\n'
-                                'There were micrographs for which CTF was not found\n'
-                                'either using micName or micId.\n')
         return errors
     
     def _citations(self):
@@ -460,6 +491,7 @@ class XmippProtExtractParticles(ProtExtractParticles, XmippProtocol):
                               SAME_AS_PICKING:'Same as picking',
                               OTHER: 'Other downsampling factor'}
         summary = []
+
         summary.append("Downsample type: %s" % downsampleTypeText.get(self.downsampleType.get()))
         
         if self.downsampleType == OTHER:
@@ -471,6 +503,7 @@ class XmippProtExtractParticles(ProtExtractParticles, XmippProtocol):
         else:
             summary.append("Particles extracted: %d" % (self.outputParticles.getSize()))
             
+        
         return summary
     
     def _methods(self):
