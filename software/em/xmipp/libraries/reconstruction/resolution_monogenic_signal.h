@@ -47,7 +47,7 @@ class ProgMonogenicSignalRes : public XmippProgram
 {
 public:
 	 /** Filenames */
-	FileName fnOut, fnVol, fnMask;
+	FileName fnOut, fnVol, fnVol1, fnVol2, fnMask, fnchim;
 
 	/** sampling rate, minumum resolutoin, and maximum resolution */
 	double sampling, minRes, maxRes;
@@ -56,7 +56,7 @@ public:
 	int R;
 
 	/** Step in digital frequency */
-	double stepW;
+	double stepW, kValue;
 public:
 
     void defineParams();
@@ -65,7 +65,7 @@ public:
 
     /* Mogonogenid amplitud of a volume, given an input volume,
      * the monogenic amplitud is calculated and low pass filtered at frequency w1*/
-    void amplitudeMonogenicSignal3D(double w1, MultidimArray<double> &amplitude);
+    void amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> > &myfftV, double w1, MultidimArray<double> &amplitude, int count);
 
     /* Median filter of an input volume, m, the output volume is the multdimArray out,
      * if the median is lesser than the threshold, then the output values is the own
@@ -77,11 +77,12 @@ public:
 public:
     Image<int> mask;
     MultidimArray<double> iu, VRiesz; // Inverse of the frequency
-	MultidimArray< std::complex<double> > fftV; // Fourier transform of the input volume
+	MultidimArray< std::complex<double> > fftV, *fftN; // Fourier transform of the input volume
 	FourierTransformer transformer_inv;
 	MultidimArray< std::complex<double> > fftVRiesz;
 	FourierFilter lowPassFilter;
 	double NS, NN; // Number of elements inside the signal and in the noise
+	bool halfMapsGiven;
 };
 //@}
 #endif

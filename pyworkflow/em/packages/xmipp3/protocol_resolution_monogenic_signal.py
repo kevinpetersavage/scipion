@@ -24,11 +24,10 @@
 # *
 # **************************************************************************
 
-from itertools import izip
 
-from pyworkflow.protocol.params import (PointerParam, EnumParam, BooleanParam, FloatParam, LEVEL_ADVANCED)
+
+from pyworkflow.protocol.params import (PointerParam, BooleanParam, FloatParam, LEVEL_ADVANCED)
 from pyworkflow.em.protocol.protocol_3d import ProtRefine3D
-from pyworkflow.em.data import Volume
 from convert import readSetOfVolumes
 from shutil import copyfile
 
@@ -48,13 +47,27 @@ class XmippProtMonoRes(ProtRefine3D):
     #--------------------------- DEFINE param functions --------------------------------------------   
     def _defineParams(self, form):
         form.addSection(label='Input')
+  
+        form.addParam('halfVolumens', BooleanParam, default=False, label="Would you like to use half volumens?", 
+                      help='The noise estimation for determining the local resolution is performed via half volumnes.')
        
         form.addParam('inputVolume', PointerParam, pointerClass='Volume', 
-                      label="Volume", 
+                      label="Input Volume", 
                       help='Select a volume for determining its local resolucion.')
+        
+        form.addParam('inputVolume2', PointerParam, pointerClass='Volume', 
+                      label="Second Half Volumen",  condition = 'halfVolumens', 
+                      help='Select a second volume for determining a local resolucion.')
         
         form.addParam('Mask', PointerParam, label="Mask", pointerClass='VolumeMask', allowsNull=True,
                       help='The mask determines the those points of the sphere where the macromolecle is')
+
+        form.addParam('premask', BooleanParam, default=False,
+                      label="Is the volume in a circular mask?",
+                      help='Sometimes the volume is in an sphere, then this option ought to be selected')
+        form.addParam('circularRadius', FloatParam, label="Radius Circular Mask",  condition = 'premask', 
+                      default=50, 
+                      help='This is the radius of the circular mask.')
 
         line = form.addLine('Resolution Range (A)', 
                       help="If the user knows the range of resolutions or only a"
@@ -65,19 +78,15 @@ class XmippProtMonoRes(ProtRefine3D):
         form.addParam('freqStep', FloatParam, label="Frequency Step",  default=0.01, expertLevel=LEVEL_ADVANCED,
                       help='The resolution is computed at frequencies between 0 and 0.5 px/A. this parameter determines'
                       'the sweep step')
-        
-        form.addParam('premask', BooleanParam, default=False,
-                      label="Is the volume in a circular mask?",
-                      help='Sometimes the volume is in an sphere, then this option ought to be selected')
-        form.addParam('circularRadius', FloatParam, label="Radius Circular Mask",  condition = 'premask', 
-                      default=50, 
-                      help='This is the radius of the circular mask.')
-
-#         form.addParam('gaussianfilter', FloatParam, label="Variance Gaussian filter",  default=0.5, expertLevel=LEVEL_ADVANCED,
-#                       help='The map of resolution is filtered by means of a gaussian filter with' 
-#                       'standard deviation provided by this parameter.')
-        
-        
+        form.addParam('trimming', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
+                      label="Remove bad resolution values?",
+                      help='In some situations bad voxels appear. This option allow to remove those voxels')
+        form.addParam('kValue', FloatParam, label="Trimming Value",  condition = 'trimming', 
+                      default=4, 
+                      help='This value performs post-processing, smoothing the output resolutions.'
+                      'If a resolution value is lesser than mean-Trimming*sigma the voxel value will' 
+                      'be given by mean-Trimming*sigma. On the other hand if the a resolution value'
+                      'is higher than mean+Trimming*sigma, the resolution will be mean+Trimming*sigma')
 
         form.addParallelSection(threads=1, mpi=1)
 
@@ -94,10 +103,12 @@ class XmippProtMonoRes(ProtRefine3D):
         fnVol = self._getExtraPath('input_volume.vol')
 
         MS = self._insertFunctionStep('resolutionMonogenicSignalStep', fnVol, prerequisites=[convertId])
-        
-        #FilterSt = self._insertFunctionStep('medianFilterStep',  prerequisites=[MS])
-        
+       
         self._insertFunctionStep('createOutputStep', prerequisites=[MS])
+        
+        self._insertFunctionStep("createChimeraScript")
+        
+        self._insertFunctionStep("createHistrogram")
        
 
     def convertInputStep(self):
@@ -108,10 +119,17 @@ class XmippProtMonoRes(ProtRefine3D):
         path_vol = self._getExtraPath() + '/input_volume.vol'
         vol_ = self.inputVolume.get().getFileName()
         copyfile(vol_,path_vol)
+        path_vol = self._getExtraPath() + '/input_mask.vol'
+        vol_ = self.Mask.get().getFileName()
+        copyfile(vol_,path_vol)
    
     def resolutionMonogenicSignalStep(self, fnVol):
 
-        params =  ' --vol %s' % fnVol
+        if self.halfVolumens.get() is False:
+            params =  ' --vol %s' % self.inputVolume.get().getFileName()
+        else:
+            params =  ' --vol1 %s' % self.inputVolume.get().getFileName()
+            params =  ' --vol2 %s' % self.inputVolume2.get().getFileName()
         params +=  ' --mask %s' % self.Mask.get().getFileName()
         params +=  ' -o %s' % self._getExtraPath('MGresolution.vol')
         params +=  ' --sampling_rate %f' % self.inputVolume.get().getSamplingRate()
@@ -119,31 +137,49 @@ class XmippProtMonoRes(ProtRefine3D):
         params +=  ' --stepW %f' % self.freqStep.get()
         params +=  ' --minRes %f' % self.minRes.get()
         params +=  ' --maxRes %f' % self.maxRes.get()
+        params +=  ' --chimera_volume %s' %self._getExtraPath('MG_Chimera_resolution.vol')
         if self.premask.get() is True:
             params +=  ' --circular_mask %f' % self.circularRadius.get()
-
-
+        if self.trimming.get() is True:
+            params +=  ' --trimmed %f' % 4.0
+        else:
+            params +=  ' --trimmed %f' % self.kValue.get()
+ 
         self.runJob('xmipp_resolution_monogenic_signal', params)
         
-#     def medianFilterStep(self):
-# 
-#         params =  ' -i %s' % self._getExtraPath('MGresolution.vol')
-#         params +=  ' --median'
-#         params +=  ' -o %s' % self._getExtraPath('outputresolution.vol')
-# 
-#         self.runJob('xmipp_transform_filter', params)
+        
+    def createChimeraScript(self):
+        fnRoot = "extra/"
+        scriptFile = self._getPath('Chimera_resolution.cmd') 
+        fhCmd = open(scriptFile, 'w')
+        fhCmd.write("open %s\n" % (fnRoot+ "input_mask.vol"))
+        fhCmd.write("open %s\n" % (fnRoot+ "MG_Chimera_resolution.vol") )
+        fhCmd.write("vol #1 hide\n")
+        fhCmd.write("scolor #0 volume #1 cmap rainbow reverseColors True\n")
+        fhCmd.close()
+        
+    def createHistrogram(self):
+
+        params =  ' -i %s' % self._getExtraPath('MGresolution.vol')
+        params +=  ' --mask binary_file %s' % self.Mask.get().getFileName()
+        params +=  ' --steps %f' % 10
+        params +=  ' -o %s' % self._getExtraPath('hist.xmd')
+
+        self.runJob('xmipp_image_histogram', params)
+
     
     def createOutputStep(self):
         volume_path = self._getExtraPath('MGresolution.vol')
-        
+         
         volumesSet = self._createSetOfVolumes()
         volumesSet.setSamplingRate(self.inputVolume.get().getSamplingRate())
-                
+                 
         readSetOfVolumes(volume_path, volumesSet)
-        
+         
         self._defineOutputs(outputVolume=volumesSet)
         self._defineSourceRelation(self.inputVolume, volumesSet)
-        
+
+    
     #--------------------------- INFO functions -------------------------------------------- 
     def _validate(self):
         
@@ -154,15 +190,16 @@ class XmippProtMonoRes(ProtRefine3D):
             validateMsgs.append('Please provide input mask.')         
         return validateMsgs
 
-    def _summary(self):
-        summary = []
 
-        if  (not hasattr(self,'outputParticles')):
-            summary.append("Output tilpairs not ready yet.")
-        else:
-            summary.append("Three-uples of Tilt pairs angles assigned: %d" %self.outputParticles.__len__())
-            #
-        return summary
+#     def _summary(self):
+#         summary = []
+# 
+#         if  (not hasattr(self,'outputParticles')):
+#             summary.append("Output tilpairs not ready yet.")
+#         else:
+#             summary.append("Three-uples of Tilt pairs angles assigned: %d" %self.outputParticles.__len__())
+#             #
+#         return summary
     
     def _methods(self):
         messages = []
@@ -173,8 +210,8 @@ class XmippProtMonoRes(ProtRefine3D):
     def _citations(self):
         return ['Not yet']
     
-    def getSummary(self):
-        summary = []
-        summary.append("Particles analyzed:")
-        #summary.append("Particles picked: %d" %coordsSet.getSize())
-        return "\n"#.join(summary)
+#     def getSummary(self):
+#         summary = []
+#         summary.append("Particles analyzed:")
+#         #summary.append("Particles picked: %d" %coordsSet.getSize())
+#         return "\n"#.join(summary)
