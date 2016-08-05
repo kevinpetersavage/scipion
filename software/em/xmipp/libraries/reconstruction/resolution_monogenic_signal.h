@@ -56,7 +56,7 @@ public:
 	int R;
 
 	/** Step in digital frequency */
-	double stepW, kValue;
+	double N_freq, kValue;
 public:
 
     void defineParams();

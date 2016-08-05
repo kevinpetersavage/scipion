@@ -39,7 +39,7 @@ void ProgMonogenicSignalRes::readParams()
 	minRes = getDoubleParam("--minRes");
 	maxRes = getDoubleParam("--maxRes");
 	R = getIntParam("--circular_mask");
-	stepW = getDoubleParam("--stepW");
+	N_freq = getDoubleParam("--number_frequencies");
 	kValue = getDoubleParam("--trimmed");
 
 
@@ -59,7 +59,8 @@ void ProgMonogenicSignalRes::defineParams()
 	addParamsLine("  [--sampling_rate <s=1>]   : Sampling rate (A/px)");
 	addParamsLine("  [--circular_mask <R=-1>]  : The volume has been masked to a sphere of this radius (in pixels)");
 	addParamsLine("                            : Use -1 to disable this option");
-	addParamsLine("  [--stepW <w=0.005>]       : Step in digital frequency (normalized to 0.5)");
+	addParamsLine("  [--number_frequencies <w=50>]       : The resolution is computed at a number of frequencies between mininum and");
+	addParamsLine("                            : maximum resolution px/A. This parameter determines that number");
 	addParamsLine("  [--minRes <s=30>]         : Minimum resolution (A)");
 	addParamsLine("  [--maxRes <s=1>]          : Maximum resolution (A)");
 	addParamsLine("  [--trimmed <s=4>]         : Trimming value for smoothing the output resolution");
@@ -353,6 +354,7 @@ void ProgMonogenicSignalRes::run()
 	double w0 = sampling/maxRes;
 	double wF = sampling/minRes;
 	double w=w0;
+	double stepW = (wF-w0)/N_freq;
 	bool doNextIteration=true;
 	int iter=0;
 	do

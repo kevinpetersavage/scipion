@@ -75,9 +75,9 @@ class XmippProtMonoRes(ProtRefine3D):
         line.addParam('minRes', FloatParam, default=1, label='Min')
         line.addParam('maxRes', FloatParam, default=100, label='Max')
         
-        form.addParam('freqStep', FloatParam, label="Frequency Step",  default=0.01, expertLevel=LEVEL_ADVANCED,
-                      help='The resolution is computed at frequencies between 0 and 0.5 px/A. this parameter determines'
-                      'the sweep step')
+#         form.addParam('freqNumber', FloatParam, label="Number of frequencies analyzed",  default=50, expertLevel=LEVEL_ADVANCED,
+#                       help='The resolution is computed at a number of frequencies between mininum and'
+#                       'maximum resolution px/A. This parameter determines that number')
         form.addParam('trimming', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
                       label="Remove bad resolution values?",
                       help='In some situations bad voxels appear. This option allow to remove those voxels')
@@ -134,7 +134,7 @@ class XmippProtMonoRes(ProtRefine3D):
         params +=  ' -o %s' % self._getExtraPath('MGresolution.vol')
         params +=  ' --sampling_rate %f' % self.inputVolume.get().getSamplingRate()
         
-        params +=  ' --stepW %f' % self.freqStep.get()
+        params +=  ' --number_frequencies %f' % 50
         params +=  ' --minRes %f' % self.minRes.get()
         params +=  ' --maxRes %f' % self.maxRes.get()
         params +=  ' --chimera_volume %s' %self._getExtraPath('MG_Chimera_resolution.vol')
