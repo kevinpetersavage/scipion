@@ -110,16 +110,22 @@ class XmippMonoResViewer(ProtocolViewer):
 #             if (y_axis__aux_last>y_axis_max):
 #                 y_axis_max = y_axis__aux_last
 
+        i = 0
         for idx in md:
             x_axis_ = md.getValue(MDL_X, idx)
+            if i==0:
+                x0 = x_axis_
+            elif i==1:
+                x1 = x_axis_
             y_axis_ = md.getValue(MDL_COUNT, idx)
 #             if (y_axis_<0.1*y_axis_max):
 #                 continue
+            i+=1
             if (y_axis_== 0):
                 continue
             x_axis.append(x_axis_)
             y_axis.append(y_axis_)
-        plt.bar(x_axis, y_axis, width = 5)
+        plt.bar(x_axis, y_axis, width = x1-x0)
         plt.title("Resolutions Histogram")
         plt.xlabel("Resolution")
         plt.ylabel("Counts")
