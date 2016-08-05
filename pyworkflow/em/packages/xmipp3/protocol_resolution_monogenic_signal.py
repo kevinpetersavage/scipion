@@ -158,11 +158,13 @@ class XmippProtMonoRes(ProtRefine3D):
         fhCmd.write("scolor #0 volume #1 cmap rainbow reverseColors True\n")
         fhCmd.close()
         
+        
     def createHistrogram(self):
 
         params =  ' -i %s' % self._getExtraPath('MGresolution.vol')
         params +=  ' --mask binary_file %s' % self.Mask.get().getFileName()
-        params +=  ' --steps %f' % 10
+        params +=  ' --steps %f' % 30
+        params +=  ' --range %f %f' % (self.minRes.get(), self.maxRes.get())
         params +=  ' -o %s' % self._getExtraPath('hist.xmd')
 
         self.runJob('xmipp_image_histogram', params)
