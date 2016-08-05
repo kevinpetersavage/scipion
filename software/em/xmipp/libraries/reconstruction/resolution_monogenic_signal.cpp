@@ -474,16 +474,65 @@ void ProgMonogenicSignalRes::run()
 	} while (doNextIteration);
 
 
-	// Compute resolution in Angstroms
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
+
+
+	double resValue;
+	if (kValue == 0)
 	{
-		if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>0)
-			DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = sampling/DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
+		// Compute resolution in Angstroms
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
+		{
+			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>0)
+				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = sampling/DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
+		}
+
+
+		std::cout << "Trimming is not performed" << std::endl;
+		outputResolution.write(fnOut);
+
+		//Calculating means and stds
+		double SumRes = 0, Nsum = 0, SumRes2 = 0;
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
+		{
+			resValue = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
+			if (resValue>0)
+			{
+				SumRes  += resValue;
+				SumRes2 += resValue*resValue;
+				Nsum += 1;
+			}
+		}
+
+		double meanRes = SumRes/Nsum;
+		double sigmaRes = sqrt(SumRes2/Nsum-meanRes*meanRes);
+
+		std::cout << "mean = " << meanRes << "  sigmaRes = " << sigmaRes << std::endl;
+
+		if (fnchim != "")
+		{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
+		{
+			resValue = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
+			if (resValue<=0)
+				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = meanRes;
+		}
+
+		outputResolution.write(fnchim);
+		}
 	}
-	outputResolution.write("pretrimming.vol");
+	else{
+
+		// Compute resolution in Angstroms
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
+		{
+			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>0)
+				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = sampling/DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
+		}
+
 
 	//Trimming volume
-	double SumRes = 0, Nsum = 0, SumRes2 = 0, resValue;
+	double SumRes = 0, Nsum = 0, SumRes2 = 0;
 
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
 	{
@@ -518,6 +567,9 @@ void ProgMonogenicSignalRes::run()
 
 	outputResolution.write(fnOut);
 
+
+
+
 	if (fnchim != "")
 	{
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
@@ -535,6 +587,7 @@ void ProgMonogenicSignalRes::run()
 	}
 
 	outputResolution.write(fnchim);
+	}
 	}
 
 

@@ -141,9 +141,9 @@ class XmippProtMonoRes(ProtRefine3D):
         if self.premask.get() is True:
             params +=  ' --circular_mask %f' % self.circularRadius.get()
         if self.trimming.get() is True:
-            params +=  ' --trimmed %f' % 4.0
-        else:
             params +=  ' --trimmed %f' % self.kValue.get()
+        else:
+            params +=  ' --trimmed %f' % 0.0
  
         self.runJob('xmipp_resolution_monogenic_signal', params)
         

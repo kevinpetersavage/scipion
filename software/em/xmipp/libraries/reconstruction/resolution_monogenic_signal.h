@@ -37,6 +37,7 @@
 #include <limits>
 #include <complex>
 #include "fourier_filter.h"
+#include <string>
 
 /**@defgroup Monogenic Resolution
    @ingroup ReconsLibrary */
