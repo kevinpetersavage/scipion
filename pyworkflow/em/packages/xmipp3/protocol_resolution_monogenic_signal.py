@@ -152,7 +152,7 @@ class XmippProtMonoRes(ProtRefine3D):
         fnRoot = "extra/"
         scriptFile = self._getPath('Chimera_resolution.cmd') 
         fhCmd = open(scriptFile, 'w')
-        fhCmd.write("open %s\n" % (fnRoot+ "input_mask.vol"))
+        fhCmd.write("open %s\n" % (fnRoot+ "input_volume.vol"))
         fhCmd.write("open %s\n" % (fnRoot+ "MG_Chimera_resolution.vol") )
         fhCmd.write("vol #1 hide\n")
         fhCmd.write("scolor #0 volume #1 cmap rainbow reverseColors True\n")
