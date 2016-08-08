@@ -41,7 +41,7 @@ void ProgMonogenicSignalRes::readParams()
 	R = getIntParam("--circular_mask");
 	N_freq = getDoubleParam("--number_frequencies");
 	kValue = getDoubleParam("--trimmed");
-
+	linearchk = checkParam("--linear");
 
 }
 
@@ -64,6 +64,8 @@ void ProgMonogenicSignalRes::defineParams()
 	addParamsLine("  [--minRes <s=30>]         : Minimum resolution (A)");
 	addParamsLine("  [--maxRes <s=1>]          : Maximum resolution (A)");
 	addParamsLine("  [--trimmed <s=4>]         : Trimming value for smoothing the output resolution");
+	addParamsLine("  [--linear]                : The search for resolution is linear (equidistance between resolutions).");
+
 
 }
 
@@ -351,17 +353,32 @@ void ProgMonogenicSignalRes::run()
 	double freq;
 	double max_meanS = -1e38;
 
+	double range = maxRes-minRes;
+	double R_ = range/N_freq;
+
 	double w0 = sampling/maxRes;
 	double wF = sampling/minRes;
 	double w=w0;
 	double stepW = (wF-w0)/N_freq;
 	bool doNextIteration=true;
 	int iter=0;
+	int count_res = 0;
+
 	do
 	{
-		resolution =  sampling/w;
-		std::cout << " Resolution = " << resolution << std::endl;
-		freq = sampling/resolution;
+		if (linearchk ==true)
+		{
+			resolution = maxRes - count_res*R_;
+			freq = sampling/resolution;
+			++count_res;
+			std::cout << " Resolution = " << resolution << std::endl;
+		}
+		else
+		{
+			resolution =  sampling/w;
+			freq = sampling/resolution;
+			std::cout << " Resolution = " << resolution << std::endl;
+		}
 
 		std::cout << "------------------------------------------------------" << std::endl;
 		std::cout << "Iteration " << iter << " Freq = " << freq << " Resolution = " << resolution << " (A)" << std::endl;
@@ -455,20 +472,30 @@ void ProgMonogenicSignalRes::run()
 
 		if (doNextIteration)
 		{
-			last_resolution = resolution;
-			w+=stepW;
-			resolution = sampling/w;
+			if (linearchk == false)
+			{
+				last_resolution = resolution;
+				w+=stepW;
+				resolution = sampling/w;
+
+
 			if (last_resolution-resolution<0.1)
 			{
 				resolution=last_resolution-0.1;
 				w = sampling/resolution;
 			}
+
 			if (w > wF)
 			{
 				doNextIteration = false;
 				std::cout << "Search of resolutions stopped due to out of resolution range" << std::endl;
 			}
-
+			}
+			else
+			{
+				if (resolution == minRes)
+					doNextIteration = false;
+			}
 		}
 		iter++;
 	} while (doNextIteration);

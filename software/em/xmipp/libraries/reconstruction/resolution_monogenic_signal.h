@@ -58,6 +58,10 @@ public:
 
 	/** Step in digital frequency */
 	double N_freq, kValue;
+
+	/** The search for resolutions is linear or inverse**/
+	bool linearchk;
+
 public:
 
     void defineParams();

@@ -138,6 +138,7 @@ class XmippProtMonoRes(ProtRefine3D):
         params +=  ' --minRes %f' % self.minRes.get()
         params +=  ' --maxRes %f' % self.maxRes.get()
         params +=  ' --chimera_volume %s' %self._getExtraPath('MG_Chimera_resolution.vol')
+        params +=  ' --linear '
         if self.premask.get() is True:
             params +=  ' --circular_mask %f' % self.circularRadius.get()
         if self.trimming.get() is True:
