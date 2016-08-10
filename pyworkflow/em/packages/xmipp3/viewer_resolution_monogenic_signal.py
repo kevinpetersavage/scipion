@@ -35,6 +35,7 @@ from pyworkflow.em.metadata import MetaData, MDL_X, MDL_COUNT
 from pyworkflow.em import ImageHandler
 import numpy as np
 import matplotlib.pyplot as plt
+from numpy import NaN
 
 # import os
 # import subprocess
@@ -90,11 +91,18 @@ class XmippMonoResViewer(ProtocolViewer):
         imgData = img.getData()
         max_Res = np.amax(imgData)
         min_Res = np.amin(imgData)
-        fig, im = self._plotVolumeSlices('MonoRes slices', imgData, 
+        print 'max_res = %f ' % max_Res
+        print 'min_res = %f ' % min_Res     
+
+        imgData2 = imgData
+        imgData2  = np.ma.masked_where(imgData < 0.01, imgData, copy=True)
+        
+        min_Res = np.amin(imgData2)
+        fig, im = self._plotVolumeSlices('MonoRes slices', imgData2, 
                                                   min_Res, max_Res, plt.cm.jet)
         cax = fig.add_axes([0.9, 0.1, 0.03, 0.8])
         fig.colorbar(im, cax=cax)
-        
+         
         return [Plotter(fig)]
                 
              
