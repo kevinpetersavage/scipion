@@ -82,7 +82,7 @@ class XmippProtMonoRes(ProtRefine3D):
                       label="Remove bad resolution values?",
                       help='In some situations bad voxels appear. This option allow to remove those voxels')
         form.addParam('kValue', FloatParam, label="Trimming Value",  condition = 'trimming', 
-                      default=4, 
+                      default=0.5, 
                       help='This value performs post-processing, smoothing the output resolutions.'
                       'If a resolution value is lesser than mean-Trimming*sigma the voxel value will' 
                       'be given by mean-Trimming*sigma. On the other hand if the a resolution value'
@@ -109,6 +109,7 @@ class XmippProtMonoRes(ProtRefine3D):
         self._insertFunctionStep("createChimeraScript")
         
         self._insertFunctionStep("createHistrogram")
+
        
 
     def convertInputStep(self):
@@ -144,7 +145,7 @@ class XmippProtMonoRes(ProtRefine3D):
         if self.trimming.get() is True:
             params +=  ' --trimmed %f' % self.kValue.get()
         else:
-            params +=  ' --trimmed %f' % 0.0
+            params +=  ' --trimmed %f' % 0
  
         self.runJob('xmipp_resolution_monogenic_signal', params)
         

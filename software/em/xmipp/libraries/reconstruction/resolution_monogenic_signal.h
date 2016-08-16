@@ -57,7 +57,7 @@ public:
 	int R;
 
 	/** Step in digital frequency */
-	double N_freq, kValue;
+	double N_freq, trimBound;
 
 	/** The search for resolutions is linear or inverse**/
 	bool linearchk;
@@ -86,7 +86,6 @@ public:
 	FourierTransformer transformer_inv;
 	MultidimArray< std::complex<double> > fftVRiesz;
 	FourierFilter lowPassFilter;
-	double NS, NN; // Number of elements inside the signal and in the noise
 	bool halfMapsGiven;
 };
 //@}

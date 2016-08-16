@@ -40,7 +40,7 @@ void ProgMonogenicSignalRes::readParams()
 	maxRes = getDoubleParam("--maxRes");
 	R = getIntParam("--circular_mask");
 	N_freq = getDoubleParam("--number_frequencies");
-	kValue = getDoubleParam("--trimmed");
+	trimBound = getDoubleParam("--trimmed");
 	linearchk = checkParam("--linear");
 
 }
@@ -63,7 +63,7 @@ void ProgMonogenicSignalRes::defineParams()
 	addParamsLine("                            : maximum resolution px/A. This parameter determines that number");
 	addParamsLine("  [--minRes <s=30>]         : Minimum resolution (A)");
 	addParamsLine("  [--maxRes <s=1>]          : Maximum resolution (A)");
-	addParamsLine("  [--trimmed <s=4>]         : Trimming value for smoothing the output resolution");
+	addParamsLine("  [--trimmed <s=0.5>]         : Trimming percentile");
 	addParamsLine("  [--linear]                : The search for resolution is linear (equidistance between resolutions).");
 
 
@@ -147,19 +147,6 @@ void ProgMonogenicSignalRes::produceSideInfo()
 	{
 		fftN=&fftV;
 		halfMapsGiven = false;
-	}
-
-	NS=0, NN=0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pMask)
-	{
-		if (DIRECT_MULTIDIM_ELEM(pMask, n)==1)
-		{
-			NS++;
-			if (halfMapsGiven)
-				NN++;
-		}
-		else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
-			NN++;
 	}
 }
 
@@ -388,7 +375,8 @@ void ProgMonogenicSignalRes::run()
 		if (halfMapsGiven)
 			amplitudeMonogenicSignal3D(*fftN, freq, amplitudeMN, iter);
 
-		double sumS=0, sumS2=0, sumN=0, sumN2=0;
+
+		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
 		if (halfMapsGiven)
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
@@ -401,11 +389,14 @@ void ProgMonogenicSignalRes::run()
 					sumS2 += amplitudeValue*amplitudeValue;
 					sumN  += amplitudeValueN;
 					sumN2 += amplitudeValueN*amplitudeValueN;
+					++NS;
+					++NN;
 				}
 				else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
 				{
 					sumN  += amplitudeValueN;
 					sumN2 += amplitudeValueN*amplitudeValueN;
+					++NN;
 				}
 			}
 		}
@@ -418,18 +409,27 @@ void ProgMonogenicSignalRes::run()
 				{
 					sumS  += amplitudeValue;
 					sumS2 += amplitudeValue*amplitudeValue;
+					++NS;
 				}
 				else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
 				{
 					sumN  += amplitudeValue;
 					sumN2 += amplitudeValue*amplitudeValue;
+					++NN;
 				}
 			}
 		}
+		if (NS == 0)
+		{
+			std::cout << "There are no points to compute inside the mask" << std::endl;
+			break;
+		}
+
 		double meanS=sumS/NS;
 		double sigma2S=sumS2/NS-meanS*meanS;
 		double meanN=sumN/NN;
 		double sigma2N=sumN2/NN-meanN*meanN;
+
 
 		if (meanS>max_meanS)
 			max_meanS = meanS;
@@ -442,28 +442,26 @@ void ProgMonogenicSignalRes::run()
 
 		// Check local resolution
 		double thresholdNoise=meanN+criticalZ*sqrt(sigma2N);
-		std::cout << "thresholdNoise = " << thresholdNoise << std::endl;
-		std::cout << "uncertain = " << criticalZ*sqrt(sigma2N) << std::endl;
-		int Entro = 0;
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
 		{
 			if (DIRECT_MULTIDIM_ELEM(pMask, n)==1)
 				if (DIRECT_MULTIDIM_ELEM(amplitudeMS, n)>thresholdNoise)
-				{
 					DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = freq;
-					++Entro;
-				}
+				else
+					DIRECT_MULTIDIM_ELEM(pMask, n) = 0;
 		}
 
-		std::cout << "mascara = " << Entro << std::endl;
-		// Continue?
+
 		// Is the mean inside the signal significantly different from the noise?
 		double z=(meanS-meanN)/sqrt(sigma2S/NS+sigma2N/NN);
-		std::cout << "  meanS= " << meanS << " sigma2S= " << sigma2S << " NS= " << NS << std::endl;
-		std::cout << "  meanN= " << meanN << " sigma2N= " << sigma2N << " NN= " << NN << std::endl;
-		std::cout << "  z=" << z << " (" << criticalZ << ")" << std::endl;
-
+		if (verbose >=2)
+		{
+			std::cout << "thresholdNoise = " << thresholdNoise << std::endl;
+			std::cout << "  meanS= " << meanS << " sigma2S= " << sigma2S << " NS= " << NS << std::endl;
+			std::cout << "  meanN= " << meanN << " sigma2N= " << sigma2N << " NN= " << NN << std::endl;
+			std::cout << "  z=" << z << " (" << criticalZ << ")" << std::endl;
+		}
 		if (z<criticalZ)
 		{
 			criticalW = freq;
@@ -504,40 +502,54 @@ void ProgMonogenicSignalRes::run()
 
 
 	double resValue;
-	if (kValue == 0)
+	if (trimBound>0)
 	{
-		// Compute resolution in Angstroms
+		// Count number of voxels with resolution
+		size_t N=0;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
-		{
 			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>0)
-				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = sampling/DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
-		}
+				++N;
 
+		// Get all resolution values
+		MultidimArray<double> resolutions(N);
+		N=0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
+			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>0)
+				DIRECT_MULTIDIM_ELEM(resolutions,N++)=DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
 
-		std::cout << "Trimming is not performed" << std::endl;
-		outputResolution.write(fnOut);
+		// Sort value and get threshold
+		std::sort(&A1D_ELEM(resolutions,0),&A1D_ELEM(resolutions,N));
+		double threshold=A1D_ELEM(resolutions,(int)(trimBound/100.0*N));
+		std::cout << "Triming threshold = " << threshold << std::endl;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
+			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)<threshold)
+				DIRECT_MULTIDIM_ELEM(pOutputResolution, n)=0;
+	}
 
-		//Calculating means and stds
-		double SumRes = 0, Nsum = 0, SumRes2 = 0;
+	// Compute resolution in Angstroms
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
+	{
+		if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>0)
+			DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = sampling/DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
+	}
+	outputResolution.write(fnOut);
 
+	// Write volume for Chimera
+	if (fnchim != "")
+	{
+		//Calculating mean
+		double SumRes = 0, Nsum = 0;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
 		{
 			resValue = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
 			if (resValue>0)
 			{
 				SumRes  += resValue;
-				SumRes2 += resValue*resValue;
 				Nsum += 1;
 			}
 		}
 
 		double meanRes = SumRes/Nsum;
-		double sigmaRes = sqrt(SumRes2/Nsum-meanRes*meanRes);
-
-		std::cout << "mean = " << meanRes << "  sigmaRes = " << sigmaRes << std::endl;
-
-		if (fnchim != "")
-		{
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
 		{
 			resValue = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
@@ -546,76 +558,5 @@ void ProgMonogenicSignalRes::run()
 		}
 
 		outputResolution.write(fnchim);
-		}
 	}
-	else{
-
-		// Compute resolution in Angstroms
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
-		{
-			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>0)
-				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = sampling/DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
-		}
-
-
-	//Trimming volume
-	double SumRes = 0, Nsum = 0, SumRes2 = 0;
-
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
-	{
-		resValue = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
-		if (resValue>0)
-		{
-			SumRes  += resValue;
-			SumRes2 += resValue*resValue;
-			Nsum += 1;
-		}
-	}
-
-	double meanRes = SumRes/Nsum;
-	double sigmaRes = sqrt(SumRes2/Nsum-meanRes*meanRes);
-
-	std::cout << "mean = " << meanRes << "  sigmaRes = " << sigmaRes << std::endl;
-
-	double maxValue = meanRes + kValue*sigmaRes;
-	double minValue = meanRes - kValue*sigmaRes;
-
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
-	{
-		resValue = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
-		if (resValue>0)
-		{
-			if (resValue>maxValue)
-				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = maxValue;
-			if (resValue<minValue)
-				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = minValue;
-		}
-	}
-
-	outputResolution.write(fnOut);
-
-
-
-
-	if (fnchim != "")
-	{
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
-	{
-		resValue = DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
-		if (resValue>0)
-		{
-			if (resValue>maxValue)
-				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = maxValue;
-			if (resValue<minValue)
-				DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = minValue;
-		}
-		else
-			DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = meanRes;
-	}
-
-	outputResolution.write(fnchim);
-	}
-	}
-
-
 }
