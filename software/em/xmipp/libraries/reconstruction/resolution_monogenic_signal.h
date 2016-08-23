@@ -48,7 +48,7 @@ class ProgMonogenicSignalRes : public XmippProgram
 {
 public:
 	 /** Filenames */
-	FileName fnOut, fnVol, fnVol1, fnVol2, fnMask, fnchim;
+	FileName fnOut, fnVol, fnVol1, fnVol2, fnMask, fnchim, fnSpatial;
 
 	/** sampling rate, minumum resolutoin, and maximum resolution */
 	double sampling, minRes, maxRes;
@@ -87,6 +87,7 @@ public:
 	MultidimArray< std::complex<double> > fftVRiesz;
 	FourierFilter lowPassFilter;
 	bool halfMapsGiven;
+	Image<double> Vfiltered, VresolutionFiltered;
 };
 //@}
 #endif

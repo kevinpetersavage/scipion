@@ -41,7 +41,9 @@ void ProgMonogenicSignalRes::readParams()
 	R = getIntParam("--circular_mask");
 	N_freq = getDoubleParam("--number_frequencies");
 	trimBound = getDoubleParam("--trimmed");
-	linearchk = checkParam("--linear");
+	linearchk = getCheckParam("--linear");
+	fnSpatial = getParam("--filtered_volume");
+
 
 }
 
@@ -65,6 +67,7 @@ void ProgMonogenicSignalRes::defineParams()
 	addParamsLine("  [--maxRes <s=1>]          : Maximum resolution (A)");
 	addParamsLine("  [--trimmed <s=0.5>]         : Trimming percentile");
 	addParamsLine("  [--linear]                : The search for resolution is linear (equidistance between resolutions).");
+	addParamsLine("  [--filtered_volume <vol_file>]       : The input volume is locally fitered at local resolutions.");
 
 
 }
@@ -78,6 +81,9 @@ void ProgMonogenicSignalRes::produceSideInfo()
 	FourierTransformer transformer;
 	MultidimArray<double> &inputVol = V();
 	VRiesz.resizeNoCopy(inputVol);
+
+	if (fnSpatial!="")
+		VresolutionFiltered().initZeros(V());
 
 	transformer.FourierTransform(inputVol, fftV);
 	iu.initZeros(fftV);
@@ -174,15 +180,17 @@ void ProgMonogenicSignalRes::amplitudeMonogenicSignal3D(MultidimArray< std::comp
 		}
 	}
 	transformer_inv.inverseFourierTransform(fftVRiesz, VRiesz);
+	if (fnSpatial!="")
+		Vfiltered()=VRiesz;
 
 	if (verbose>=2)
 	{
-	Image<double> saveImg2;
-	saveImg2() = VRiesz;
-	FileName fnSaveImg0;
-	fnSaveImg0 = formatString("filteredVolume_%i.vol", count);
-	saveImg2.write(fnSaveImg0);
-	saveImg2.clear();
+		Image<double> saveImg2;
+		saveImg2() = VRiesz;
+		FileName fnSaveImg0;
+		fnSaveImg0 = formatString("filteredVolume_%i.vol", count);
+		saveImg2.write(fnSaveImg0);
+		saveImg2.clear();
 	}
 
 
@@ -331,6 +339,9 @@ void ProgMonogenicSignalRes::run()
 
 	MultidimArray<int> &pMask = mask();
 	MultidimArray<double> &pOutputResolution = outputResolution();
+	MultidimArray<double> &pVfiltered = Vfiltered();
+	MultidimArray<double> &pVresolutionFiltered = VresolutionFiltered();
+	//MultidimArray<double> &pOutputResolution = outputResolution();
 	MultidimArray<double> amplitudeMS, amplitudeMN;
 
 	std::cout << "Looking for maximum frequency ..." << std::endl;
@@ -443,11 +454,16 @@ void ProgMonogenicSignalRes::run()
 		// Check local resolution
 		double thresholdNoise=meanN+criticalZ*sqrt(sigma2N);
 
+
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
 		{
 			if (DIRECT_MULTIDIM_ELEM(pMask, n)==1)
 				if (DIRECT_MULTIDIM_ELEM(amplitudeMS, n)>thresholdNoise)
+				{
 					DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = freq;
+					if (fnSpatial!="")
+						DIRECT_MULTIDIM_ELEM(pVresolutionFiltered,n)=DIRECT_MULTIDIM_ELEM(pVfiltered,n);
+				}
 				else
 					DIRECT_MULTIDIM_ELEM(pMask, n) = 0;
 		}
@@ -498,7 +514,22 @@ void ProgMonogenicSignalRes::run()
 		iter++;
 	} while (doNextIteration);
 
+	if (fnSpatial!="")
+	{
+		mask.read(fnMask);
+		mask().setXmippOrigin();
+		Vfiltered.read(fnVol);
+		pVfiltered=Vfiltered();
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pVfiltered)
+		if (DIRECT_MULTIDIM_ELEM(pMask,n)==1)
+			DIRECT_MULTIDIM_ELEM(pVfiltered,n)-=DIRECT_MULTIDIM_ELEM(pVresolutionFiltered,n);
+//		else
+//			DIRECT_MULTIDIM_ELEM(pVfiltered,n)=0;
+		Vfiltered.write(fnSpatial);
 
+		VresolutionFiltered().clear();
+		Vfiltered().clear();
+	}
 
 
 	double resValue;

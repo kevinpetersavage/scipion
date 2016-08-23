@@ -87,6 +87,10 @@ class XmippProtMonoRes(ProtRefine3D):
                       'If a resolution value is lesser than mean-Trimming*sigma the voxel value will' 
                       'be given by mean-Trimming*sigma. On the other hand if the a resolution value'
                       'is higher than mean+Trimming*sigma, the resolution will be mean+Trimming*sigma')
+        
+        form.addParam('filterInput', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
+                      label="Filter ap with local resolution?",
+                      help='The input map is locally filtered at the local resolution map.')
 
         form.addParallelSection(threads=1, mpi=1)
 
@@ -140,12 +144,17 @@ class XmippProtMonoRes(ProtRefine3D):
         params +=  ' --maxRes %f' % self.maxRes.get()
         params +=  ' --chimera_volume %s' %self._getExtraPath('MG_Chimera_resolution.vol')
         params +=  ' --linear '
+        if self.filterInput.get():
+            params +=  ' --filtered_volume %s' %self._getExtraPath('filteredMap.vol')
+            
         if self.premask.get() is True:
             params +=  ' --circular_mask %f' % self.circularRadius.get()
         if self.trimming.get() is True:
             params +=  ' --trimmed %f' % self.kValue.get()
         else:
             params +=  ' --trimmed %f' % 0
+            
+            
  
         self.runJob('xmipp_resolution_monogenic_signal', params)
         
