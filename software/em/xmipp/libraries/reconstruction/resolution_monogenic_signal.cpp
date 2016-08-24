@@ -41,7 +41,7 @@ void ProgMonogenicSignalRes::readParams()
 	R = getIntParam("--circular_mask");
 	N_freq = getDoubleParam("--number_frequencies");
 	trimBound = getDoubleParam("--trimmed");
-	linearchk = getCheckParam("--linear");
+	linearchk = checkParam("--linear");
 	fnSpatial = getParam("--filtered_volume");
 
 
