@@ -68,7 +68,7 @@ void ProgMonogenicSignalRes::defineParams()
 	addParamsLine("  [--maxRes <s=1>]          : Maximum resolution (A)");
 	addParamsLine("  [--trimmed <s=0.5>]         : Trimming percentile");
 	addParamsLine("  [--linear]                : The search for resolution is linear (equidistance between resolutions).");
-	addParamsLine("  [--filtered_volume]       : The input volume is locally fitered at local resolutions.");
+	addParamsLine("  [--filtered_volume <vol_file=\"\">]       : The input volume is locally filtered at local resolutions.");
 
 
 }

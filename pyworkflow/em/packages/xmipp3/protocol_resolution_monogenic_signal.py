@@ -153,7 +153,7 @@ class XmippProtMonoRes(ProtRefine3D):
         if self.filterInput.get():
             params +=  ' --filtered_volume %s' %self._getExtraPath('filteredMap.vol')
         else:
-            params +=  ' --filtered_volume'
+            params +=  ' --filtered_volume %s' %''
 
         if self.premask.get() is True:
             params +=  ' --circular_mask %f' % self.circularRadius.get()
