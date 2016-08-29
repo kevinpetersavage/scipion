@@ -81,6 +81,10 @@ class XmippProtMonoRes(ProtRefine3D):
         form.addParam('trimming', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
                       label="Remove bad resolution values?",
                       help='In some situations bad voxels appear. This option allow to remove those voxels')
+#         form.addParam('exact', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
+#                       label="Find exact resolution?",
+#                       help='The noise estimation can be performed exact (slow) or approximated (fast)'
+#                       'ussually there has not difference between them')
         form.addParam('kValue', FloatParam, label="Trimming Value",  condition = 'trimming', 
                       default=0.5, 
                       help='This value performs post-processing, smoothing the output resolutions.'
@@ -89,7 +93,7 @@ class XmippProtMonoRes(ProtRefine3D):
                       'is higher than mean+Trimming*sigma, the resolution will be mean+Trimming*sigma')
         
         form.addParam('filterInput', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
-                      label="Filter ap with local resolution?",
+                      label="Filter input volume with local resolution?",
                       help='The input map is locally filtered at the local resolution map.')
 
         form.addParallelSection(threads=1, mpi=1)
@@ -144,9 +148,13 @@ class XmippProtMonoRes(ProtRefine3D):
         params +=  ' --maxRes %f' % self.maxRes.get()
         params +=  ' --chimera_volume %s' %self._getExtraPath('MG_Chimera_resolution.vol')
         params +=  ' --linear '
+#         if self.exact.get():
+#             params +=  ' --exact_resolution'
         if self.filterInput.get():
             params +=  ' --filtered_volume %s' %self._getExtraPath('filteredMap.vol')
-            
+        else:
+            params +=  ' --filtered_volume'
+
         if self.premask.get() is True:
             params +=  ' --circular_mask %f' % self.circularRadius.get()
         if self.trimming.get() is True:

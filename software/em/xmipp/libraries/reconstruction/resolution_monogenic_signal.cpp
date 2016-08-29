@@ -42,6 +42,7 @@ void ProgMonogenicSignalRes::readParams()
 	N_freq = getDoubleParam("--number_frequencies");
 	trimBound = getDoubleParam("--trimmed");
 	linearchk = checkParam("--linear");
+//	exactres = checkParam("--exact");
 	fnSpatial = getParam("--filtered_volume");
 
 
@@ -362,6 +363,7 @@ void ProgMonogenicSignalRes::run()
 	int iter=0;
 	int count_res = 0;
 
+	std::vector<double> noiseValues;
 	do
 	{
 		if (linearchk ==true)
@@ -388,6 +390,7 @@ void ProgMonogenicSignalRes::run()
 
 
 		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
+		noiseValues.clear();
 		if (halfMapsGiven)
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
@@ -398,6 +401,7 @@ void ProgMonogenicSignalRes::run()
 				{
 					sumS  += amplitudeValue;
 					sumS2 += amplitudeValue*amplitudeValue;
+					noiseValues.push_back(amplitudeValueN);
 					sumN  += amplitudeValueN;
 					sumN2 += amplitudeValueN*amplitudeValueN;
 					++NS;
@@ -405,6 +409,7 @@ void ProgMonogenicSignalRes::run()
 				}
 				else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
 				{
+					noiseValues.push_back(amplitudeValueN);
 					sumN  += amplitudeValueN;
 					sumN2 += amplitudeValueN*amplitudeValueN;
 					++NN;
@@ -424,6 +429,7 @@ void ProgMonogenicSignalRes::run()
 				}
 				else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
 				{
+					noiseValues.push_back(amplitudeValue);
 					sumN  += amplitudeValue;
 					sumN2 += amplitudeValue*amplitudeValue;
 					++NN;
@@ -452,7 +458,9 @@ void ProgMonogenicSignalRes::run()
 		}
 
 		// Check local resolution
-		double thresholdNoise=meanN+criticalZ*sqrt(sigma2N);
+		// double thresholdNoise=meanN+criticalZ*sqrt(sigma2N);
+		std::sort(noiseValues.begin(),noiseValues.end());
+		double thresholdNoise=noiseValues[size_t(noiseValues.size()*0.95)];
 
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
