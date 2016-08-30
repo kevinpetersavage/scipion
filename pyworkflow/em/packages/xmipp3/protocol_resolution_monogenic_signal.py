@@ -81,10 +81,10 @@ class XmippProtMonoRes(ProtRefine3D):
         form.addParam('trimming', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
                       label="Remove bad resolution values?",
                       help='In some situations bad voxels appear. This option allow to remove those voxels')
-#         form.addParam('exact', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
-#                       label="Find exact resolution?",
-#                       help='The noise estimation can be performed exact (slow) or approximated (fast)'
-#                       'ussually there has not difference between them')
+        form.addParam('exact', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
+                      label="Find exact resolution?",
+                      help='The noise estimation can be performed exact (slow) or approximated (fast)'
+                      'ussually there has not difference between them')
         form.addParam('kValue', FloatParam, label="Trimming Value",  condition = 'trimming', 
                       default=0.5, 
                       help='This value performs post-processing, smoothing the output resolutions.'
@@ -148,8 +148,8 @@ class XmippProtMonoRes(ProtRefine3D):
         params +=  ' --maxRes %f' % self.maxRes.get()
         params +=  ' --chimera_volume %s' %self._getExtraPath('MG_Chimera_resolution.vol')
         params +=  ' --linear '
-#         if self.exact.get():
-#             params +=  ' --exact_resolution'
+        if self.exact.get():
+            params +=  ' --exact'
         if self.filterInput.get():
             params +=  ' --filtered_volume %s' %self._getExtraPath('filteredMap.vol')
         else:

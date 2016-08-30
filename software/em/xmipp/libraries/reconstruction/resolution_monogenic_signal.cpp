@@ -42,7 +42,7 @@ void ProgMonogenicSignalRes::readParams()
 	N_freq = getDoubleParam("--number_frequencies");
 	trimBound = getDoubleParam("--trimmed");
 	linearchk = checkParam("--linear");
-//	exactres = checkParam("--exact");
+	exactres = checkParam("--exact");
 	fnSpatial = getParam("--filtered_volume");
 
 
@@ -68,6 +68,8 @@ void ProgMonogenicSignalRes::defineParams()
 	addParamsLine("  [--maxRes <s=1>]          : Maximum resolution (A)");
 	addParamsLine("  [--trimmed <s=0.5>]         : Trimming percentile");
 	addParamsLine("  [--linear]                : The search for resolution is linear (equidistance between resolutions).");
+	addParamsLine("  [--exact]                 : The search for resolution will be exact (slower) of approximated (fast).");
+	addParamsLine("                            : Usually there are no difference between both in the resolution map.");
 	addParamsLine("  [--filtered_volume <vol_file=\"\">]       : The input volume is locally filtered at local resolutions.");
 
 
@@ -298,39 +300,6 @@ void ProgMonogenicSignalRes::amplitudeMonogenicSignal3D(MultidimArray< std::comp
 
 }
 
-void ProgMonogenicSignalRes::medianFilter3x3x3Thresholding(MultidimArray<double> &m, MultidimArray<double> &out, double threshold)
-{
-	out = m;
-	std::vector<double> values(6);
-
-	for (size_t k = 1; k<(ZSIZE(m)-1); k++)
-	{
-	  for (size_t i= 1; i<(YSIZE(m)-1); i++)
-	  {
-		for (size_t j= 1; j<(XSIZE(m)-1); j++)
-		{
-		  values[0] = A3D_ELEM(m, k-1, i, j);
-		  values[1] = A3D_ELEM(m, k+1, i, j);
-		  values[2] = A3D_ELEM(m, k, i-1, j);
-		  values[3] = A3D_ELEM(m, k, i+1, j);
-		  values[4] = A3D_ELEM(m, k, i, j-1);
-		  values[5] = A3D_ELEM(m, k, i, j+1);
-
-		  std::sort(values.begin(), values.end());
-
-		  double val = 0.5* (values[2] + values[3]);
-		  if (val>10*threshold)
-			  val = 15*threshold;
-		  if (val>threshold)
-			  A3D_ELEM(out, k, i, j) = val;
-		}
-	  }
-	}
-}
-
-
-
-
 void ProgMonogenicSignalRes::run()
 {
 	produceSideInfo();
@@ -391,51 +360,100 @@ void ProgMonogenicSignalRes::run()
 
 		double sumS=0, sumS2=0, sumN=0, sumN2=0, NN = 0, NS = 0;
 		noiseValues.clear();
-		if (halfMapsGiven)
+		if (exactres)
 		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-			{
-				double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
-				double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
-				if (DIRECT_MULTIDIM_ELEM(pMask, n)==1)
-				{
-					sumS  += amplitudeValue;
-					sumS2 += amplitudeValue*amplitudeValue;
-					noiseValues.push_back(amplitudeValueN);
-					sumN  += amplitudeValueN;
-					sumN2 += amplitudeValueN*amplitudeValueN;
-					++NS;
-					++NN;
-				}
-				else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
-				{
-					noiseValues.push_back(amplitudeValueN);
-					sumN  += amplitudeValueN;
-					sumN2 += amplitudeValueN*amplitudeValueN;
-					++NN;
-				}
-			}
+			if (halfMapsGiven)
+					{
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
+						{
+							double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
+							double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
+							if (DIRECT_MULTIDIM_ELEM(pMask, n)==1)
+							{
+								sumS  += amplitudeValue;
+								sumS2 += amplitudeValue*amplitudeValue;
+								noiseValues.push_back(amplitudeValueN);
+								sumN  += amplitudeValueN;
+								sumN2 += amplitudeValueN*amplitudeValueN;
+								++NS;
+								++NN;
+							}
+							else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
+							{
+								noiseValues.push_back(amplitudeValueN);
+								sumN  += amplitudeValueN;
+								sumN2 += amplitudeValueN*amplitudeValueN;
+								++NN;
+							}
+						}
+					}
+					else
+					{
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
+						{
+							double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
+							if (DIRECT_MULTIDIM_ELEM(pMask, n)==1)
+							{
+								sumS  += amplitudeValue;
+								sumS2 += amplitudeValue*amplitudeValue;
+								++NS;
+							}
+							else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
+							{
+								noiseValues.push_back(amplitudeValue);
+								sumN  += amplitudeValue;
+								sumN2 += amplitudeValue*amplitudeValue;
+								++NN;
+							}
+						}
+					}
 		}
 		else
 		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
-			{
-				double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
-				if (DIRECT_MULTIDIM_ELEM(pMask, n)==1)
-				{
-					sumS  += amplitudeValue;
-					sumS2 += amplitudeValue*amplitudeValue;
-					++NS;
-				}
-				else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
-				{
-					noiseValues.push_back(amplitudeValue);
-					sumN  += amplitudeValue;
-					sumN2 += amplitudeValue*amplitudeValue;
-					++NN;
-				}
-			}
+			if (halfMapsGiven)
+					{
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
+						{
+							double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
+							double amplitudeValueN=DIRECT_MULTIDIM_ELEM(amplitudeMN, n);
+							if (DIRECT_MULTIDIM_ELEM(pMask, n)==1)
+							{
+								sumS  += amplitudeValue;
+								sumS2 += amplitudeValue*amplitudeValue;
+								sumN  += amplitudeValueN;
+								sumN2 += amplitudeValueN*amplitudeValueN;
+								++NS;
+								++NN;
+							}
+							else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
+							{
+								sumN  += amplitudeValueN;
+								sumN2 += amplitudeValueN*amplitudeValueN;
+								++NN;
+							}
+						}
+					}
+					else
+					{
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)
+						{
+							double amplitudeValue=DIRECT_MULTIDIM_ELEM(amplitudeMS, n);
+							if (DIRECT_MULTIDIM_ELEM(pMask, n)==1)
+							{
+								sumS  += amplitudeValue;
+								sumS2 += amplitudeValue*amplitudeValue;
+								++NS;
+							}
+							else if (DIRECT_MULTIDIM_ELEM(pMask, n)==0)
+							{
+								sumN  += amplitudeValue;
+								sumN2 += amplitudeValue*amplitudeValue;
+								++NN;
+							}
+						}
+					}
 		}
+
 		if (NS == 0)
 		{
 			std::cout << "There are no points to compute inside the mask" << std::endl;
@@ -458,9 +476,17 @@ void ProgMonogenicSignalRes::run()
 		}
 
 		// Check local resolution
-		// double thresholdNoise=meanN+criticalZ*sqrt(sigma2N);
-		std::sort(noiseValues.begin(),noiseValues.end());
-		double thresholdNoise=noiseValues[size_t(noiseValues.size()*0.95)];
+		double thresholdNoise;
+		if (exactres)
+		{
+			thresholdNoise = noiseValues[size_t(noiseValues.size()*0.95)];
+			std::sort(noiseValues.begin(),noiseValues.end());
+		}
+		else
+			thresholdNoise = meanN+criticalZ*sqrt(sigma2N);
+
+
+
 
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)

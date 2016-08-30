@@ -60,7 +60,7 @@ public:
 	double N_freq, trimBound;
 
 	/** The search for resolutions is linear or inverse**/
-	bool linearchk;//, exactres;
+	bool linearchk, exactres;
 
 public:
 
@@ -71,11 +71,6 @@ public:
     /* Mogonogenid amplitud of a volume, given an input volume,
      * the monogenic amplitud is calculated and low pass filtered at frequency w1*/
     void amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> > &myfftV, double w1, MultidimArray<double> &amplitude, int count);
-
-    /* Median filter of an input volume, m, the output volume is the multdimArray out,
-     * if the median is lesser than the threshold, then the output values is the own
-     * threshold. Ohterwise, the output value is the median*/
-    void medianFilter3x3x3Thresholding(MultidimArray<double> &m, MultidimArray<double> &out, double threshold);
 
     void run();
 
