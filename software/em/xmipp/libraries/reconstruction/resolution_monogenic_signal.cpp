@@ -315,7 +315,7 @@ void ProgMonogenicSignalRes::run()
 	MultidimArray<double> amplitudeMS, amplitudeMN;
 
 	std::cout << "Looking for maximum frequency ..." << std::endl;
-	double criticalZ=icdf_gauss(0.95);
+	double criticalZ=icdf_gauss(0.99);
 	double criticalW=-1;
 	double resolution, last_resolution = 10000;  //A huge value for achieving last_resolution < resolution
 	double freq;
@@ -340,16 +340,13 @@ void ProgMonogenicSignalRes::run()
 			resolution = maxRes - count_res*R_;
 			freq = sampling/resolution;
 			++count_res;
-			std::cout << " Resolution = " << resolution << std::endl;
 		}
 		else
 		{
 			resolution =  sampling/w;
 			freq = sampling/resolution;
-			std::cout << " Resolution = " << resolution << std::endl;
 		}
 
-		std::cout << "------------------------------------------------------" << std::endl;
 		std::cout << "Iteration " << iter << " Freq = " << freq << " Resolution = " << resolution << " (A)" << std::endl;
 
 
@@ -479,7 +476,7 @@ void ProgMonogenicSignalRes::run()
 		double thresholdNoise;
 		if (exactres)
 		{
-			thresholdNoise = noiseValues[size_t(noiseValues.size()*0.95)];
+			thresholdNoise = noiseValues[size_t(noiseValues.size()*0.99)];
 			std::sort(noiseValues.begin(),noiseValues.end());
 		}
 		else
