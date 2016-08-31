@@ -585,7 +585,7 @@ void ProgMonogenicSignalRes::run()
 		std::cout << "Triming threshold = " << threshold << std::endl;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
 			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)<threshold)
-				DIRECT_MULTIDIM_ELEM(pOutputResolution, n)=threshold;
+				DIRECT_MULTIDIM_ELEM(pOutputResolution, n)=A1D_ELEM(resolutions,(int)(N*0.5));
 	}
 
 	// Compute resolution in Angstroms
