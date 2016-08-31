@@ -86,11 +86,9 @@ class XmippProtMonoRes(ProtRefine3D):
                       help='The noise estimation can be performed exact (slow) or approximated (fast)'
                       'ussually there has not difference between them')
         form.addParam('kValue', FloatParam, label="Trimming Value",  condition = 'trimming', 
-                      default=0.5, 
+                      default=5, 
                       help='This value performs post-processing, smoothing the output resolutions.'
-                      'If a resolution value is lesser than mean-Trimming*sigma the voxel value will' 
-                      'be given by mean-Trimming*sigma. On the other hand if the a resolution value'
-                      'is higher than mean+Trimming*sigma, the resolution will be mean+Trimming*sigma')
+                      'The resolutions in this percentile, will be changed by the mean value')
         
         form.addParam('filterInput', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
                       label="Filter input volume with local resolution?",
