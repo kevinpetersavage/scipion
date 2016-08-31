@@ -192,7 +192,7 @@ class XmippProtMonoRes(ProtRefine3D):
     
     def createOutputStep(self):
         volume_path = self._getExtraPath('MGresolution.vol')
-        volume_filtered_path = self._getExtraPath('filteredMap.vol')
+        
          
         volumesSet = self._createSetOfVolumes()
         volumesSet.setSamplingRate(self.inputVolume.get().getSamplingRate())
@@ -202,12 +202,13 @@ class XmippProtMonoRes(ProtRefine3D):
         self._defineOutputs(outputVolume=volumesSet)
         self._defineSourceRelation(self.inputVolume, volumesSet)
         
-        volumesSet2 = self._createSetOfVolumes()
-        volumesSet2.setSamplingRate(self.inputVolume.get().getSamplingRate())
-        readSetOfVolumes(volume_filtered_path, volumesSet2)
-         
-        self._defineOutputs(outputVolume=volumesSet2)
-        self._defineSourceRelation(self.inputVolume, volumesSet2)
+        if self.filterInput.get():
+            volume_filtered_path = self._getExtraPath('filteredMap.vol')
+            volumesSet2 = self._createSetOfVolumes()
+            volumesSet2.setSamplingRate(self.inputVolume.get().getSamplingRate())
+            readSetOfVolumes(volume_filtered_path, volumesSet2)
+            self._defineOutputs(outputVolume=volumesSet2)
+            self._defineSourceRelation(self.inputVolume, volumesSet2)
         
 
     
