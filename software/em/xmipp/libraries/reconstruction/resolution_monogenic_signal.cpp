@@ -584,7 +584,7 @@ void ProgMonogenicSignalRes::run()
 		double threshold=A1D_ELEM(resolutions,(int)(trimBound/100.0*N));
 		std::cout << "Triming threshold = " << threshold << std::endl;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pOutputResolution)
-			if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)<threshold)
+			if ((DIRECT_MULTIDIM_ELEM(pOutputResolution, n)<threshold) && (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>0))
 				DIRECT_MULTIDIM_ELEM(pOutputResolution, n)=A1D_ELEM(resolutions,(int)(N*0.5));
 	}
 
