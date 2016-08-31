@@ -44,6 +44,7 @@ void ProgMonogenicSignalRes::readParams()
 	linearchk = checkParam("--linear");
 	exactres = checkParam("--exact");
 	fnSpatial = getParam("--filtered_volume");
+	significance = getDoubleParam("--significance");
 
 
 }
@@ -71,6 +72,7 @@ void ProgMonogenicSignalRes::defineParams()
 	addParamsLine("  [--exact]                 : The search for resolution will be exact (slower) of approximated (fast).");
 	addParamsLine("                            : Usually there are no difference between both in the resolution map.");
 	addParamsLine("  [--filtered_volume <vol_file=\"\">]       : The input volume is locally filtered at local resolutions.");
+	addParamsLine("  [--significance <s=0.95>]  : The level of conficendence for the hypothesis test.");
 
 
 }
@@ -315,7 +317,7 @@ void ProgMonogenicSignalRes::run()
 	MultidimArray<double> amplitudeMS, amplitudeMN;
 
 	std::cout << "Looking for maximum frequency ..." << std::endl;
-	double criticalZ=icdf_gauss(0.99);
+	double criticalZ=icdf_gauss(significance);
 	double criticalW=-1;
 	double resolution, last_resolution = 10000;  //A huge value for achieving last_resolution < resolution
 	double freq;
@@ -476,7 +478,7 @@ void ProgMonogenicSignalRes::run()
 		double thresholdNoise;
 		if (exactres)
 		{
-			thresholdNoise = noiseValues[size_t(noiseValues.size()*0.99)];
+			thresholdNoise = noiseValues[size_t(noiseValues.size()*significance)];
 			std::sort(noiseValues.begin(),noiseValues.end());
 		}
 		else

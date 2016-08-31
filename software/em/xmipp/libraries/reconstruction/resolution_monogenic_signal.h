@@ -57,7 +57,7 @@ public:
 	int R;
 
 	/** Step in digital frequency */
-	double N_freq, trimBound;
+	double N_freq, trimBound, significance;
 
 	/** The search for resolutions is linear or inverse**/
 	bool linearchk, exactres;

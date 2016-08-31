@@ -75,24 +75,26 @@ class XmippProtMonoRes(ProtRefine3D):
         line.addParam('minRes', FloatParam, default=1, label='Min')
         line.addParam('maxRes', FloatParam, default=100, label='Max')
         
-#         form.addParam('freqNumber', FloatParam, label="Number of frequencies analyzed",  default=50, expertLevel=LEVEL_ADVANCED,
-#                       help='The resolution is computed at a number of frequencies between mininum and'
-#                       'maximum resolution px/A. This parameter determines that number')
-        form.addParam('trimming', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
-                      label="Remove bad resolution values?",
-                      help='In some situations bad voxels appear. This option allow to remove those voxels')
+        form.addParam('significance', FloatParam, label="Significance",  default=0.95, expertLevel=LEVEL_ADVANCED,
+                      help='The resolution is computed performing hypothesis tests. This parameter determines'
+                      ' the significance for that test.')
         form.addParam('exact', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
                       label="Find exact resolution?",
                       help='The noise estimation can be performed exact (slow) or approximated (fast)'
                       'ussually there has not difference between them')
+        form.addParam('filterInput', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
+                      label="Filter input volume with local resolution?",
+                      help='The input map is locally filtered at the local resolution map.')
+        form.addParam('trimming', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
+                      label="Remove bad resolution values?",
+                      help='In some situations bad voxels appear. This option allow to remove those voxels')
+        
         form.addParam('kValue', FloatParam, label="Trimming Value",  condition = 'trimming', 
                       default=5, 
                       help='This value performs post-processing, smoothing the output resolutions.'
                       'The resolutions in this percentile, will be changed by the mean value')
         
-        form.addParam('filterInput', BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
-                      label="Filter input volume with local resolution?",
-                      help='The input map is locally filtered at the local resolution map.')
+        
 
         form.addParallelSection(threads=1, mpi=1)
 
@@ -146,6 +148,7 @@ class XmippProtMonoRes(ProtRefine3D):
         params +=  ' --maxRes %f' % self.maxRes.get()
         params +=  ' --chimera_volume %s' %self._getExtraPath('MG_Chimera_resolution.vol')
         params +=  ' --linear '
+        params +=  ' --significance %s' %self.significance.get()
         if self.exact.get():
             params +=  ' --exact'
         if self.filterInput.get():
@@ -189,6 +192,7 @@ class XmippProtMonoRes(ProtRefine3D):
     
     def createOutputStep(self):
         volume_path = self._getExtraPath('MGresolution.vol')
+        volume_filtered_path = self._getExtraPath('filteredMap.vol')
          
         volumesSet = self._createSetOfVolumes()
         volumesSet.setSamplingRate(self.inputVolume.get().getSamplingRate())
@@ -197,6 +201,14 @@ class XmippProtMonoRes(ProtRefine3D):
          
         self._defineOutputs(outputVolume=volumesSet)
         self._defineSourceRelation(self.inputVolume, volumesSet)
+        
+        volumesSet2 = self._createSetOfVolumes()
+        volumesSet2.setSamplingRate(self.inputVolume.get().getSamplingRate())
+        readSetOfVolumes(volume_filtered_path, volumesSet2)
+         
+        self._defineOutputs(outputVolume=volumesSet2)
+        self._defineSourceRelation(self.inputVolume, volumesSet2)
+        
 
     
     #--------------------------- INFO functions -------------------------------------------- 
