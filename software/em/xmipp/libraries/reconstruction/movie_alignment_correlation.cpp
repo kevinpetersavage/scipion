@@ -210,7 +210,6 @@ void ProgMovieAlignmentCorrelation::run()
 
         if (n>=nfirst && n<=nlast)
         {
-        	std::cout << fnFrame << std::endl;
             movie.getValue(MDL_IMAGE,fnFrame,__iter.objId);
             if (yDRcorner==-1)
                 cropedFrame.read(fnFrame);
@@ -267,7 +266,6 @@ void ProgMovieAlignmentCorrelation::run()
     Mcorr.resizeNoCopy(newYdim,newXdim);
     Mcorr.setXmippOrigin();
     CorrelationAux aux;
-    std::cout << "Aqui 1" << std::endl;
     for (size_t i=0; i<N-1; ++i)
     {
         for (size_t j=i+1; j<N; ++j)
