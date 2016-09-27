@@ -335,7 +335,8 @@ void ProgCTFEstimateFromPSD::readBasicParams(XmippProgram *program)
     initial_ctfmodel.enable_CTF = initial_ctfmodel.enable_CTFnoise = true;
     initial_ctfmodel.readParams(program);
     if (initial_ctfmodel.DeltafU>100e3 || initial_ctfmodel.DeltafV>100e3)
-    	REPORT_ERROR(ERR_ARG_INCORRECT,"Defocus cannot be larger than 10 microns (100,000 Angstroms)");
+//    	REPORT_ERROR(ERR_ARG_INCORRECT,"Defocus cannot be larger than 10 microns (100,000 Angstroms)");
+	    std::cout << "Initial defocus cannot be larger than 10 microns (100,000 Angstroms). However, I will continue with this value\n";
     Tm = initial_ctfmodel.Tm;
 }
 
