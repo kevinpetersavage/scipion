@@ -24,8 +24,8 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
-#ifndef _PROG_MONOGENIC_DENOISING
-#define _PROG_MONOGENIC_DENOISING
+#ifndef _PROG_MONOGENIC_SCREENING
+#define _PROG_MONOGENIC_SCREENING
 
 #include <iostream>
 #include <data/xmipp_program.h>
@@ -40,25 +40,25 @@
 #include "project.h"
 #include <string>
 
-/**@defgroup Monogenic Resolution
+/**@defgroup Monogenic Screening
    @ingroup ReconsLibrary */
 //@{
 /** SSNR parameters. */
 
-class ProgMonogenicDenoising : public XmippProgram
+class ProgMonogenicScreening : public XmippProgram
 {
 public:
 	 /** Filenames */
-	FileName fnOut, fnStack, fnSpatial;
+	FileName fnOut, fnStack, fnSpatial, fnScreening;
 
-	/** sampling rate, minumum resolutoin, and maximum resolution */
+	/** sampling rate, minumum resolution, and maximum resolution */
 	double sampling, minRes, maxRes;
 
-	/** Is the volume previously masked?*/
+	/** Particle radius*/
 	int R;
 
 	/** Step in digital frequency */
-	double N_freq;
+	double N_freq, significance;
 
 	/** The search for resolutions is linear or inverse**/
 	bool linearchk;

@@ -24,25 +24,26 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
-#include "image_monogenic_denoising.h"
-#define DEBUG
+#include "image_monogenic_screening.h"
+//#define DEBUG
 
-void ProgMonogenicDenoising::readParams()
+void ProgMonogenicScreening::readParams()
 {
 	fnStack = getParam("--stack");
 	fnOut = getParam("-o");
 	sampling = getDoubleParam("--sampling_rate");
 	minRes = getDoubleParam("--minRes");
 	maxRes = getDoubleParam("--maxRes");
-	R = getIntParam("--circular_mask");
 	N_freq = getDoubleParam("--number_frequencies");
 	linearchk = checkParam("--linear");
 	fnSpatial = getParam("--filtered");
+	fnScreening = getParam("--screening");
+	significance = getDoubleParam("--significance");
 
 }
 
 
-void ProgMonogenicDenoising::defineParams()
+void ProgMonogenicScreening::defineParams()
 {
 	addUsageLine("This function determines the local resolution of a map");
 	addParamsLine("  --stack <md_file>   : Metadata Stack with particles");
@@ -56,10 +57,12 @@ void ProgMonogenicDenoising::defineParams()
 	addParamsLine("  [--maxRes <s=1>]          : Maximum resolution (A)");
 	addParamsLine("  [--linear]                : The search for resolution is linear (equidistance between resolutions).");
 	addParamsLine("  [--filtered <stk_file=\"\">]: Local resolution volume (in Angstroms)");
+	addParamsLine("  --screening <md_file=\"\">: Screening metadata");
+	addParamsLine("  [--significance <s=0.95>]   : Significance (by default 0.95)");
 
 }
 
-void ProgMonogenicDenoising::produceSideInfo(Image<double> &V)
+void ProgMonogenicScreening::produceSideInfo(Image<double> &V)
 {
 
 	FourierTransformer transformer;
@@ -102,7 +105,7 @@ void ProgMonogenicDenoising::produceSideInfo(Image<double> &V)
 
 }
 
-void ProgMonogenicDenoising::amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> > &myfftV,
+void ProgMonogenicScreening::amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> > &myfftV,
 		double w1, MultidimArray<double> &amplitude, int count)
 {
 	fftVRiesz.initZeros(myfftV);
@@ -223,7 +226,7 @@ void ProgMonogenicDenoising::amplitudeMonogenicSignal3D(MultidimArray< std::comp
 	}
 }
 
-void ProgMonogenicDenoising::computingResolutions(const MultidimArray<double> &p2mask, Image<double> &outputResolution, FileName fnVol, Image<double> &out_filtered)
+void ProgMonogenicScreening::computingResolutions(const MultidimArray<double> &p2mask, Image<double> &outputResolution, FileName fnVol, Image<double> &out_filtered)
 {
 
 	outputResolution().initZeros(VRiesz);
@@ -233,7 +236,6 @@ void ProgMonogenicDenoising::computingResolutions(const MultidimArray<double> &p
 	MultidimArray<double> amplitudeMS, amplitudeMN;
 	MultidimArray<double> &pVresolutionFiltered = VresolutionFiltered();
 
-	std::cout << "Looking for maximum frequency ..." << std::endl;
 	double significance = 0.95;
 	double criticalZ=icdf_gauss(significance);
 	double criticalW=-1;
@@ -267,7 +269,7 @@ void ProgMonogenicDenoising::computingResolutions(const MultidimArray<double> &p
 			freq = sampling/resolution;
 		}
 
-		std::cout << "Iteration " << iter << " Freq = " << freq << " Resolution = " << resolution << " (A)" << std::endl;
+//		std::cout << "Iteration " << iter << " Freq = " << freq << " Resolution = " << resolution << " (A)" << std::endl;
 
 
 		amplitudeMonogenicSignal3D(fftV, freq, amplitudeMS, iter);
@@ -307,7 +309,7 @@ void ProgMonogenicDenoising::computingResolutions(const MultidimArray<double> &p
 
 		if (NS == 0)
 		{
-			std::cout << "There are no points to compute inside the mask" << std::endl;
+//			std::cout << "There are no points to compute inside the mask" << std::endl;
 			break;
 		}
 
@@ -322,7 +324,7 @@ void ProgMonogenicDenoising::computingResolutions(const MultidimArray<double> &p
 
 		if (meanS<0.001*max_meanS)
 		{
-			std::cout << "Search of resolutions stopped due to too low signal" << std::endl;
+//			std::cout << "Search of resolutions stopped due to too low signal" << std::endl;
 			break;
 		}
 
@@ -394,6 +396,7 @@ void ProgMonogenicDenoising::computingResolutions(const MultidimArray<double> &p
 		iter++;
 	} while (doNextIteration);
 
+	std::cout << "resolution = " << resolution << std::endl;
 	if (fnSpatial!="")
 	{
 //	mask.read(fnMask);
@@ -420,14 +423,12 @@ void ProgMonogenicDenoising::computingResolutions(const MultidimArray<double> &p
 		if (DIRECT_MULTIDIM_ELEM(pOutputResolution, n)>0)
 			DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = sampling/DIRECT_MULTIDIM_ELEM(pOutputResolution, n);
 		else
-			DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = 1;
+			DIRECT_MULTIDIM_ELEM(pOutputResolution, n) = 0;
 	}
-	//outputResolution.write(fnOut);
-	std::cout << "last_resolutoin = " << resolution << std::endl;
 }
 
 
-void ProgMonogenicDenoising::run()
+void ProgMonogenicScreening::run()
 {
 	MetaData mdStack;
 	FileName filename_particle;
@@ -457,23 +458,28 @@ void ProgMonogenicDenoising::run()
 			A2D_ELEM(p2mask,i,j)=1;
 	}
 
-	Image<double> saveImg2;
-	saveImg2() = p2mask;
-	saveImg2.write("mask_.xmp");
+//	Image<double> saveImg2;
+//	saveImg2() = p2mask;
+//	saveImg2.write("mask_.xmp");
 
 
 	Image<double> outputResolution;
+	double area;
+	double median_val;
+	std::vector<double> resValues, densities_vec;
 
+	MetaData md_screening, md_screeningClean;
+	MDRow row;
 	FileName fnout_set = formatString("newset.stk");
 	//FileName fnout_filtered = formatString("filtered_set.stk");
 	size_t id_part;
 	FOR_ALL_OBJECTS_IN_METADATA(mdStack)
 	{
+		area = 0;
+		median_val = 0;
 		mdStack.getValue(MDL_IMAGE, filename_particle, __iter.objId);
-		mdStack.getValue(MDL_PARTICLE_ID, id_part, __iter.objId);
-		std::cout << "particula = " << filename_particle << std::endl;
-		std::cout << "id_part " << id_part << std::endl;
-
+		mdStack.getValue(MDL_ITEM_ID, id_part, __iter.objId);
+		std::cout << "particle = " << filename_particle << std::endl;
 
 		Img_par.read(filename_particle);
 		Img_par().setXmippOrigin();
@@ -498,6 +504,66 @@ void ProgMonogenicDenoising::run()
 			out_filtered.write(fnSpatial, id_part, true, WRITE_APPEND);
 		out_filtered.clear();
 
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(outputResolution())
+		{
+			if (DIRECT_MULTIDIM_ELEM(outputResolution(), n)>0)
+			{
+				resValues.push_back(DIRECT_MULTIDIM_ELEM(outputResolution(), n));
+				++area;
+			}
+		}
 
+		std::sort(resValues.begin(),resValues.end());
+		double density = 1e-38;
+		if (area ==0)
+		{
+			std::cout << "Particle must be removed" << std::endl;
+			area = 1e-38;
+			median_val = 1e+38;
+			density = 0;
+		}
+		else
+		{
+			median_val = resValues[size_t(area*0.5)];
+			density = (maxRes+minRes-median_val)*area;
+		}
+		mdStack.getRow(row, __iter.objId);
+		row.setValue(MDL_COST, density);
+		row.setValue(MDL_WEIGHT, area);
+		row.setValue(MDL_AVG, median_val);
+		size_t objId_ = md_screening.addObject();
+		md_screening.setRow(row, objId_);
+
+		densities_vec.push_back(density);
+
+		resValues.clear();
 	}
+
+	md_screening.write(fnOut);
+
+
+	std::sort(densities_vec.begin(),densities_vec.end());
+
+
+	double thresholdDensity = densities_vec[size_t(densities_vec.size()*(1-significance))];
+
+	std::cout << "threshold = " << thresholdDensity << std::endl;
+
+
+	double cost;
+	FOR_ALL_OBJECTS_IN_METADATA(md_screening)
+	{
+		md_screening.getValue(MDL_COST, cost, __iter.objId);
+		std::cout << "cost = " << cost << std::endl;
+		if (cost > thresholdDensity)
+		{
+			md_screening.getRow(row, __iter.objId);
+			size_t objId2_ = md_screeningClean.addObject();
+			md_screeningClean.setRow(row, objId2_);
+		}
+	}
+
+	md_screeningClean.write(fnScreening);
+
+
 }
