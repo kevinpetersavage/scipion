@@ -483,7 +483,6 @@ for p in ['angular_break_symmetry',
           'angular_neighbourhood',
           'angular_projection_matching',
           'angular_project_library',
-          'angular_solid_angle_assignment',
           'angular_rotate',
 
           'classify_analyze_cluster',
