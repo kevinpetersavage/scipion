@@ -349,9 +349,7 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
         
         volumesSet = self._createSetOfVolumes()
         volumesSet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
-        
         readSetOfVolumes(volume_path, volumesSet)
-        
         self._defineOutputs(outputVolume=volumesSet)
         self._defineSourceRelation(self.tilpairparticles, volumesSet)
         
@@ -360,7 +358,7 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
         Upath = self._getExtraPath('all_untilted_particles_input_angular_assignment_lastiter.xmd')
         readSetOfParticles(Upath, USet)
         USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
-        self._defineOutputs(outputParticles=USet)
+        self._defineOutputs(outputUntiltedParticles=USet)
         self._defineSourceRelation(self.tilpairparticles.get().getUntilted(), USet)
        
                
@@ -368,7 +366,7 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
         Tpath = self._getExtraPath('all_tilted_particles_input_angular_assignment_lastiter.xmd')
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
-        self._defineOutputs(outputParticles=TSet)
+        self._defineOutputs(outputTiltedParticles=TSet)
         self._defineSourceRelation(self.tilpairparticles.get().getTilted(), TSet)
 
 
@@ -388,7 +386,7 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
     def _summary(self):
         summary = []
 
-        if  (not hasattr(self,'outputParticles')):
+        if  (not hasattr(self,'outputTiltedParticles')):
             summary.append("Output tilpairs not ready yet.")
         else:
             summary.append("Three-uples of Tilt pairs angles assigned: %d" %self.outputParticles.__len__())
@@ -397,7 +395,7 @@ class XmippProtAngularTiltPairAssignment(ProtRefine3D):
     
     def _methods(self):
         messages = []
-        if (hasattr(self,'outputParticles')):
+        if (hasattr(self,'outputTiltedParticles')):
             messages.append('An angular assignment of untilted and tilted particles is carried out [Publication: Not yet]')
         return messages
     
