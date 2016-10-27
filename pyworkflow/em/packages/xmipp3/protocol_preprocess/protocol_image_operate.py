@@ -52,6 +52,7 @@ OP_SQRT = 9
 OP_ABS = 10
 OP_POW = 11
 OP_SLICE = 12
+
 OP_RADIAL = 13
 OP_RESET = 14
 
@@ -132,7 +133,8 @@ class XmippOperateHelper():
         self._defineSpecificParams(form)
         form.addParam('value', params.FloatParam,
                       allowNull=True,
-                      condition='isValue and '+binaryCondition+' or '+powCondition,
+                      condition='isValue and %s or %s' %
+                                (binaryCondition, powCondition),
                       label='Input value ',
                       help = 'Set the desire float value')
         form.addParam('intValue', params.IntParam,
@@ -180,7 +182,7 @@ class XmippProtImageOperateParticles(ProtOperateParticles,
                                      XmippProcessParticles,
                                      XmippOperateHelper):
     """ Apply an operation to two sets of particles  """
-    _label = 'operate particle'
+    _label = 'operate particles'
     
     def __init__(self, **args):
         ProtOperateParticles.__init__(self, **args)
@@ -269,7 +271,7 @@ class XmippProtImageOperateVolumes(ProtOperateVolumes,
                                    XmippProcessVolumes,
                                    XmippOperateHelper):
     """ Apply an operation to two sets of volumes """
-    _label = 'operate volume'
+    _label = 'operate volumes'
      
     def __init__(self, **args):
         ProtOperateVolumes.__init__(self, **args)
@@ -283,8 +285,8 @@ class XmippProtImageOperateVolumes(ProtOperateVolumes,
     def _defineSpecificParams(self, form):
         form.addParam('inputVolumes2', params.PointerParam,
                       allowNull=True,
-                      condition=(binaryCondition+' and (not isValue) or '
-                                 +dotCondition),
+                      condition=(binaryCondition + ' and (not isValue) or '
+                                 + dotCondition),
                       label='Input Volumes (2nd)',
                       help = 'This parameter depends of the input volume(s). '
                              'If it is set a volume (or a SetOfVolumes) as '
@@ -299,7 +301,8 @@ class XmippProtImageOperateVolumes(ProtOperateVolumes,
             writeSetOfVolumes(self.inputVolumes.get(), self.inputFn)
             
             if self.inputVolumes2.get() is not None:
-                writeSetOfVolumes(self.inputVolumes2.get(), self._getSecondSetFn())
+                writeSetOfVolumes(self.inputVolumes2.get(),
+                                  self._getSecondSetFn())
     
     def operationStep(self, operationStr):
         dictImgFn = {"inputFn" : self.inputFn}

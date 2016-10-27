@@ -21,13 +21,10 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 
-"""
-This module implement viewers for some type of common objects.
-"""
 from __future__ import print_function
 import os
 import sys
@@ -38,6 +35,7 @@ from multiprocessing.connection import Client
 from numpy import flipud
 import socket
 
+import pyworkflow as pw
 from pyworkflow.viewer import View, Viewer, CommandView, DESKTOP_TKINTER
 from pyworkflow.utils import Environ, runJob
 from pyworkflow.utils import getFreePort
@@ -46,11 +44,14 @@ from pyworkflow.gui.matplotlib_image import ImageWindow
 # From pyworkflow.em level
 import showj
 import metadata as md
-import xmipp
 from data import PdbFile
+from convert import ImageHandler
+
+import xmipp
 
 from viewer_fsc import FscViewer
 from viewer_pdf import PDFReportViewer
+from viewer_monitor_summary import ViewerMonitorSummary
 
 #------------------------ Some common Views ------------------
 
@@ -64,14 +65,23 @@ class DataView(View):
         self._viewParams = viewParams
             
     def _loadPath(self, path):
+        self._tableName = None
+
+        # If path is a tuple, we will convert to the filename format
+        # as expected by Showj
+        if isinstance(path, tuple):
+            self._path = ImageHandler.locationToXmipp(path)
         # Check if there is a table name with @ in path
         # in that case split table name and path
         # table names can never starts with a number
         # this is considering an image inside an stack
-        if '@' in path and path[0] not in '0123456789':
-            self._tableName, self._path = path.split('@')
+        elif isinstance(path, basestring):
+            if '@' in path and path[0] not in '0123456789':
+                self._tableName, self._path = path.split('@')
+            else:
+                self._path = path
         else:
-            self._tableName, self._path = None, path
+            raise Exception("Invalid input path, should be 'string' or 'tuple'")
             
     def show(self):        
         showj.runJavaIJapp(self._memory, 'xmipp.viewer.scipion.ScipionViewer',
@@ -81,7 +91,7 @@ class DataView(View):
         tableName = '%s@' % self._tableName if self._tableName else ''
         params = '-i "%s%s"' % (tableName, self._path)
         for key, value in self._viewParams.items():
-            params = "%s --%s %s"%(params, key, value)
+            params = "%s --%s %s" % (params, key, value)
         
         return params
     
@@ -115,7 +125,6 @@ class DataView(View):
             showj.ORDER,
             showj.RENDER,
             showj.SORT_BY
-#             'columns',
         }
         
         params = {}
@@ -123,7 +132,7 @@ class DataView(View):
         for key, value in self._viewParams.items():
             print (str(key), ":",str(value))
             if key in parameters:
-                if key == 'mode' and value =='metadata':
+                if key == 'mode' and value == 'metadata':
                     value = 'table'
                 params[key] = value
         
@@ -138,7 +147,8 @@ class DataView(View):
         
 class ObjectView(DataView):
     """ Wrapper to DataView but for displaying Scipion objects. """
-    def __init__(self, project, inputid, path, other='', viewParams={}, **kwargs):
+    def __init__(self, project, inputid, path, other='', viewParams={},
+                 **kwargs):
         DataView.__init__(self, path, viewParams, **kwargs)
         self.type = type
         self.port = project.port
@@ -146,12 +156,13 @@ class ObjectView(DataView):
         self.other = other
         
     def getShowJParams(self):
-        # mandatory to provide scipion params
-        params = DataView.getShowJParams(self) + ' --scipion %s %s %s' % (self.port, self.inputid, self.other)
-        return params
+        # Add the scipion parameters over the normal showj params
+        return '%s --scipion %s %s %s' % (DataView.getShowJParams(self),
+                                          self.port, self.inputid, self.other)
     
     def show(self):
-        showj.runJavaIJapp(self._memory, 'xmipp.viewer.scipion.ScipionViewer', self.getShowJParams(), env=self._env)
+        showj.runJavaIJapp(self._memory, 'xmipp.viewer.scipion.ScipionViewer',
+                           self.getShowJParams(), env=self._env)
         
 
 class CtfView(ObjectView):
@@ -184,8 +195,12 @@ class CtfView(ObjectView):
         if psdLabels:
             viewParams[showj.RENDER] = psdLabels
 
+        if ctfSet.isStreamOpen():
+            viewParams['dont_recalc_ctf'] = ''
+
         if first.hasAttribute('_ctffind4_ctfResolution'):
-            viewParams[showj.OBJCMDS] = "'%s'" % showj.OBJCMD_CTFFIND4
+            import pyworkflow.em.packages.grigoriefflab.viewer as gviewer
+            viewParams[showj.OBJCMDS] = "'%s'" % gviewer.OBJCMD_CTFFIND4
 
         inputId = ctfSet.getObjId() or ctfSet.getFileName()
         ObjectView.__init__(self, project,
@@ -195,7 +210,8 @@ class CtfView(ObjectView):
 
 class ClassesView(ObjectView):
     """ Customized ObjectView for SetOfClasses. """
-    def __init__(self, project, inputid, path, other='', viewParams={}, **kwargs):
+    def __init__(self, project, inputid, path, other='',
+                 viewParams={}, **kwargs):
         labels =  'enabled id _size _representative._filename'
         defaultViewParams = {showj.ORDER:labels,
                              showj.VISIBLE: labels, 
@@ -204,21 +220,25 @@ class ClassesView(ObjectView):
                              showj.LABELS: 'id _size',
                              }
         defaultViewParams.update(viewParams)
-        ObjectView.__init__(self, project, inputid, path, other, defaultViewParams, **kwargs)
+        ObjectView.__init__(self, project, inputid, path, other,
+                            defaultViewParams, **kwargs)
         
         
 class Classes3DView(ClassesView):
     """ Customized ObjectView for SetOfClasses. """
-    def __init__(self, project, inputid, path, other='', viewParams={}, **kwargs):
+    def __init__(self, project, inputid, path, other='',
+                 viewParams={}, **kwargs):
         defaultViewParams = {showj.ZOOM: '99', 
                              showj.MODE: 'metadata'}
         defaultViewParams.update(viewParams)
-        ClassesView.__init__(self, project, inputid, path, other, defaultViewParams, **kwargs)
+        ClassesView.__init__(self, project, inputid, path, other,
+                             defaultViewParams, **kwargs)
 
 
 class CoordinatesObjectView(DataView):
     """ Wrapper to View but for displaying Scipion objects. """
-    def __init__(self, project, path, outputdir, protocol, pickerProps=None, inTmpFolder=False, **kwargs):
+    def __init__(self, project, path, outputdir, protocol, pickerProps=None,
+                 inTmpFolder=False, **kwargs):
         DataView.__init__(self, path, **kwargs)
         self.project = project
         self.outputdir = outputdir
@@ -226,13 +246,11 @@ class CoordinatesObjectView(DataView):
         self.pickerProps = pickerProps
         self.inTmpFolder = inTmpFolder
         
-#     def getShowJParams(self):
-#         params = '--input %s --output %s --mode %s'%(self._path, self.outputdir, self.mode)
-#         return params
-    
     def show(self):
-        #showj.runJavaIJapp(self._memory, 'xmipp.viewer.particlepicker.training.SupervisedPickerRunner', self.getShowJParams(), env=self._env)
-        return showj.launchSupervisedPickerGUI(self._path, self.outputdir, self.protocol, pickerProps=self.pickerProps, inTmpFolder=self.inTmpFolder)
+        return showj.launchSupervisedPickerGUI(self._path, self.outputdir,
+                                               self.protocol,
+                                               pickerProps=self.pickerProps,
+                                               inTmpFolder=self.inTmpFolder)
         
         
 class ImageView(View):
@@ -254,6 +272,10 @@ def getChimeraEnviron():
     environ = Environ(os.environ)
     environ.set('PATH', os.path.join(os.environ['CHIMERA_HOME'], 'bin'),
                 position=Environ.BEGIN)
+
+    if "REMOTE_MESA_LIB" in os.environ:
+        environ.set('LD_LIBRARY_PATH', os.environ['REMOTE_MESA_LIB'],
+                    position=Environ.BEGIN)
     return environ    
     
   
@@ -280,13 +302,14 @@ class ChimeraClientView(CommandView):
 class ChimeraDataView(ChimeraClientView):
 
     def __init__(self, dataview, vol, viewParams={}, **kwargs):
-        #print 'on pair'
         self.dataview = dataview
         self.showjPort = getFreePort()
         self.dataview._viewParams[showj.CHIMERA_PORT] = self.showjPort
         self.dataview._viewParams[showj.MODE] = showj.MODE_MD
         self.dataview._viewParams[showj.INVERTY] = ''
-        ChimeraClientView.__init__(self, vol.getFileName(), showProjection=True, showjPort=self.showjPort, voxelSize=vol.getSamplingRate())
+        ChimeraClientView.__init__(self, vol.getFileName(), showProjection=True,
+                                   showjPort=self.showjPort,
+                                   voxelSize=vol.getSamplingRate())
 
     def show(self):
         self.dataview.show()
@@ -315,7 +338,8 @@ class ChimeraViewer(Viewer):
             # for the second, the visualize directly shows the objects. 
             # the first approach is better 
         else:
-            raise Exception('ChimeraViewer.visualize: can not visualize class: %s' % obj.getClassName())
+            raise Exception('ChimeraViewer.visualize: can not visualize class: %s'
+                            % obj.getClassName())
 
 
 class ChimeraClient:
@@ -344,7 +368,7 @@ class ChimeraClient:
         self.address = ''
         self.port = getFreePort()
 
-        serverfile = os.path.join(os.environ['SCIPION_HOME'], 'pyworkflow', 'em', 'chimera_server.py')
+        serverfile = pw.join('em', 'chimera_server.py')
         command = CommandView("chimera --script '%s %s %s' &" %
                               (serverfile, self.port,serverName),
                              env=getChimeraEnviron(),).show()
@@ -442,9 +466,9 @@ class ChimeraAngDistClient(ChimeraClient):
         interval = maxweight - minweight
 
         self.angulardist = []
-        x2=self.xdim/2
-        y2=self.ydim/2
-        z2=self.zdim/2
+        x2 = self.xdim/2
+        y2 = self.ydim/2
+        z2 = self.zdim/2
         #cofr does not seem to work!
         #self.angulardist.append('cofr %d,%d,%d'%(x2,y2,z2))
         for id in mdAngDist:
@@ -452,7 +476,8 @@ class ChimeraAngDistClient(ChimeraClient):
             tilt = mdAngDist.getValue(angleTiltLabel, id)
             psi = mdAngDist.getValue(anglePsiLabel, id) if anglePsiLabel else 0
             weight = mdAngDist.getValue(md.MDL_WEIGHT, id)
-            weight = 0 if interval == 0 else (weight - minweight)/interval#avoid cero division
+            # Avoid zero division
+            weight = 0 if interval == 0 else (weight - minweight)/interval
             weight = weight + 0.5#add 0.5 to avoid cero weight
             x, y, z = xmipp.Euler_direction(rot, tilt, psi)
             radius = weight * self.spheresMaxRadius
@@ -460,7 +485,8 @@ class ChimeraAngDistClient(ChimeraClient):
             x = x * self.spheresDistance + x2
             y = y * self.spheresDistance + y2
             z = z * self.spheresDistance + z2
-            command = 'shape sphere radius %s center %s,%s,%s color %s '%(radius, x, y, z, self.spheresColor)
+            command = 'shape sphere radius %s center %s,%s,%s color %s '\
+                      %(radius, x, y, z, self.spheresColor)
             self.angulardist.append(command)
             #printCmd(command)
 
@@ -508,7 +534,7 @@ class ChimeraVirusClient(ChimeraClient):
         self.send('command_list', commandList)
         #get va with sphere centers
 
-        #va coordinates of  vertex of the triangles inside de canonical trianlge
+        #va coordinates of  vertex of the triangles inside de canonical triangle
         msg1    = self.client.recv()
         self.va = self.client.recv()
         ####self.listToBild(self.va,1.6,msg1+'.bild')
@@ -540,13 +566,14 @@ class ChimeraVirusClient(ChimeraClient):
             pass
 
     def listenShowJ(self):
-        """This function with a very confusing name send messages to
+        """ This function with a very confusing name send messages to
         the chimera server"""
 
         while True:
             try:
                 (clientsocket, address) = self.serversocket.accept()
-                msg = clientsocket.recv(1024)#should be a single message, so no loop
+                # Should be a single message, so no loop
+                msg = clientsocket.recv(1024)
                 tokens = shlex.split(msg)
                 cmd = tokens[0]
                 if cmd == 'rotate':
@@ -582,10 +609,13 @@ class ChimeraProjectionClient(ChimeraAngDistClient):
         paddingFactor = self.kwargs.get('paddingFactor', 1)
         maxFreq = self.kwargs.get('maxFreq', 0.5)
         splineDegree = self.kwargs.get('splineDegree', 2)
-        self.fourierprojector = xmipp.FourierProjector(self.image, paddingFactor, maxFreq, splineDegree)
+        self.fourierprojector = xmipp.FourierProjector(self.image, paddingFactor,
+                                                       maxFreq, splineDegree)
         self.fourierprojector.projectVolume(self.projection, 0, 0, 0)
         self.showjPort = self.kwargs.get('showjPort', None)
-        self.iw = ImageWindow(filename=os.path.basename(volfile),image=self.projection, dim=self.size, label="Projection")
+        self.iw = ImageWindow(filename=os.path.basename(volfile),
+                              image=self.projection,
+                              dim=self.size, label="Projection")
         self.iw.updateData(flipud(self.projection.getData()))
         if self.showjPort:
             self.showjThread = Thread(target=self.listenShowJ)
@@ -596,9 +626,9 @@ class ChimeraProjectionClient(ChimeraAngDistClient):
 
 
     def rotate(self, rot, tilt, psi):
-
         self.fourierprojector.projectVolume(self.projection, rot, tilt, psi)
         self.projectionData = flipud(self.projection.getData())
+
         if hasattr(self, 'iw'):#sometimes is not created and rotate is called
             self.iw.updateData(self.projectionData)
 
@@ -693,9 +723,10 @@ class VmdViewer(Viewer):
         
         if issubclass(cls, PdbFile):
             VmdView(obj.getFileName()).show()
-            #FIXME: there is an asymetry between ProtocolViewer and Viewer
-            # for the first, the visualize method return a list of View's (that are shown)
-            # for the second, the visualize directly shows the objects. 
-            # the first approach is better 
+            #FIXME: there is an asymetry between ProtocolViewer and Viewer.
+            # For the first, the visualize method return a list of View's,
+            # while for the second, the visualize method directly shows
+            # the objects. (the first approach is preferable)
         else:
-            raise Exception('VmdViewer.visualize: can not visualize class: %s' % obj.getClassName())     
+            raise Exception('VmdViewer.visualize: can not visualize class: %s'
+                            % obj.getClassName())
