@@ -526,8 +526,8 @@ void ProgAngularTiltPairAssignment::run()
 //		//Storing assignments into output metadata
 		MetaData mduntilt_output, mdtilt_output, md_union, md_union_aux;
 
-		FileName filnm_md_u = formatString("particles@%s/%s", fnDir.c_str(), fnOutUntiltedAssign.c_str());
-		FileName filnm_md_t = formatString("particles@%s/%s", fnDir.c_str(), fnOutTiltedAssign.c_str());
+		FileName filnm_md_u = formatString("particles@%s", fnDir.c_str(), fnOutUntiltedAssign.c_str());
+		FileName filnm_md_t = formatString("particles@%s", fnDir.c_str(), fnOutTiltedAssign.c_str());
 
 		md_union_aux = mdt_all;
 		md_union = mdu_all;
@@ -537,6 +537,7 @@ void ProgAngularTiltPairAssignment::run()
 
 		fnall_md = formatString("particles@%s/All_angular_assignment_lastiter.xmd", fnDir.c_str());
 		md_union.write(fnall_md);
+
 		mdu_all.write(filnm_md_u);
 		mdt_all.write(filnm_md_t);
 		}

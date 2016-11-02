@@ -54,7 +54,7 @@ void ProgClassifyTiltPairs::readParams()
 	fnUntiltedOdir1 = getParam("--odirMdUntilted_Vol1");
 	fnTiltedOdir1 = getParam("--odirMdTilted_Vol1");
 	fnUntiltedOdir2 = getParam("--odirMdUntilted_Vol2");
-	fnTiltedOdir1 = getParam("--odirMdTilted_Vol2");
+	fnTiltedOdir2 = getParam("--odirMdTilted_Vol2");
 }
 ProgClassifyTiltPairs::ProgClassifyTiltPairs()
 {
@@ -150,7 +150,7 @@ void ProgClassifyTiltPairs::run()
 			}
 
 		}
-		std::cout << "iter %f" << k << std::endl;
+		//std::cout << "iter %f" << k << std::endl;
 		objId++;
 		idx++;
 	}

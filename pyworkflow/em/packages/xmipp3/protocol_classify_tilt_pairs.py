@@ -120,7 +120,7 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         stepId2 = self._insertFunctionStep('angularTiltAssignmentStep', 2,prerequisites=[stepId])
         stepId3 = self._insertFunctionStep('classifyStep', prerequisites=[stepId2])
         
-        deps.append(stepId2)
+        deps.append(stepId3)
 
         self._insertFunctionStep('createOutputStep', prerequisites=deps)
 
@@ -227,7 +227,7 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         params += ' --odirMdUntilted_Vol2 %s' % self._getExtraPath('Untilted_assignment_vol2.xmd')
         params += ' --odirMdTilted_Vol2 %s' % self._getExtraPath('Tilted_assignment_vol2.xmd')
         
-        self.runJob('xmipp_classify_tilt_pairs', params)
+        self.runJob('xmipp_classify_tilt_pairs', params, numberOfMpi=1)
         
     
     def angularTiltAssignmentStep(self, volume2assign):
@@ -255,20 +255,36 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
 
 
     def createOutputStep(self):
-        USet = self._createSetOfParticles("Untilted")
-        Upath = self._getExtraPath('assignment_vol1.xmd')
+        USet = self._createSetOfParticles("UntiltedVol1")
+        Upath = self._getExtraPath('vol1_untilted.xmd')
+        readSetOfParticles(Upath, USet)
+        USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
+        self._defineOutputs(outputUntiltedParticles=USet)
+        self._defineSourceRelation(self.tilpairparticles.get(), USet)
+        
+        USet = self._createSetOfParticles("UntiltedVol2")
+        Upath = self._getExtraPath('vol2_untilted.xmd')
         readSetOfParticles(Upath, USet)
         USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
         self._defineOutputs(outputUntiltedParticles=USet)
         self._defineSourceRelation(self.tilpairparticles.get(), USet)
        
                
-        TSet = self._createSetOfParticles("Tilted")
-        Tpath = self._getExtraPath('assignment_vol2.xmd')
+        TSet = self._createSetOfParticles("TiltedVol1")
+        Tpath = self._getExtraPath('vol1_tilted.xmd')
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
         self._defineOutputs(outputTiltedParticles=TSet)
         self._defineSourceRelation(self.tilpairparticles.get(), TSet)
+        
+        TSet = self._createSetOfParticles("TiltedVol2")
+        Tpath = self._getExtraPath('vol2_tilted.xmd')
+        readSetOfParticles(Tpath, TSet)
+        TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
+        self._defineOutputs(outputTiltedParticles=TSet)
+        self._defineSourceRelation(self.tilpairparticles.get(), TSet)
+        
+        
 
     #--------------------------- INFO functions -------------------------------------------- 
     def _validate(self):
