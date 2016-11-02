@@ -54,3 +54,20 @@ class Timer(object):
 
         if self.verbose and toPrint and self.msecs > Timer.minms:
             print '{0} {1:10.0f} ms : {2}'.format(' ' * Timer.indentation, self.msecs, self.name)
+
+
+def dump_garbage():
+    """
+    show us what's the garbage about
+    """
+    import gc
+
+    # force collection
+    print "\nGARBAGE:"
+    gc.collect()
+
+    print "\nGARBAGE OBJECTS:"
+    for x in gc.garbage:
+        s = str(x)
+        if len(s) > 80: s = s[:80]
+        print type(x), "\n  ", s
