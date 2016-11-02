@@ -23,8 +23,8 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
-#ifndef TILT_PAIR_ASSIGNMENT_H_
-#define TILT_PAIR_ASSIGNMENT_H_
+#ifndef CLASSIFY_TILT_PAIRS_H_
+#define CLASSIFY_TILT_PAIRS_H_
 #define PI 3.14159265
 
 
@@ -35,7 +35,7 @@
 #include <alglib/src/ap.h>
 //#include <fourier_filter.h>
 
-class ProgAngularTiltPairAssignment: public XmippProgram
+class ProgClassifyTiltPairs: public XmippProgram
 {
 public:
 	// Internal members
@@ -46,7 +46,8 @@ public:
 
 public:
     /** Filenames */
-    FileName fnUntilt, fnTilt, fnDir, fnVol, fnSym, fnmic, fnOutUntiltedAssign, fnOutTiltedAssign;
+    FileName fnMdUntilted1, fnMdTilted1, fnMdUntilted2, fnMdTilted2, fnUntiltedOdir1, fnTiltedOdir1,
+    fnUntiltedOdir2, fnTiltedOdir2, fnVol, fnVol2, fnSym, fnmic;
 
     /** Particle size, sampling rate*/
     double smprt, alphaU, alphaT, tilt_mic;
@@ -56,7 +57,7 @@ public:
 
 public:
     /// Empty constructor
-    ProgAngularTiltPairAssignment();
+    ProgClassifyTiltPairs();
 
 public:
 
@@ -66,11 +67,9 @@ public:
 
     void run();
 
-    void generateProjections(FileName &fnVol, double &smprt);
+    void generateProjections(const FileName &fnVol, double &smprt, FileName galleryfn);
 
     void generateFourierStack(const MultidimArray<double> &input_stack,	std::vector< AlignmentTransforms> &galleryTransforms_Test);
-
-    void generateInitialBall(const MetaData &md_u,const MetaData &md_t, MetaData &md_u_assign_iter0, MetaData &md_t_assign_iter0, FileName &fnVol);
 
 //    /// Gather alignment
 //	virtual void gatherAlignment() {}
