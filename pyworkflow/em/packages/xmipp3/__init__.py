@@ -55,7 +55,6 @@ from viewer_resolution3d import XmippResolution3DViewer
 from viewer_validate_nontilt import XmippValidateNonTiltViewer
 from viewer_validate_overfitting import XmippValidateOverfittingViewer
 from viewer_split_volume import XmippViewerSplitVolume
-from viewer_validate_tilt_pairs import XmippValidationTiltPairsViewer
 from viewer_volume_strain import XmippVolumeStrainViewer
 
 #from viewer_reconstruct_significant import XmippReconstructSignificantViewer
@@ -71,6 +70,7 @@ from protocol_apply_transformation_matrix import XmippProtApplyTransformationMat
 from protocol_break_symmetry import XmippProtAngBreakSymmetry
 from protocol_cl2d_align import XmippProtCL2DAlign
 from protocol_cl2d import XmippProtCL2D
+from protocol_classify_tilt_pairs import XmippProtClassifyTiltPairs
 from protocol_cltomo import XmippProtCLTomo
 # from protocol_ctf_defocus_group import XmippProtCTFDefocusGroup
 from protocol_compare_reprojections import XmippProtCompareReprojections
@@ -113,7 +113,6 @@ from pyworkflow.em.packages.xmipp3.protocol_angular_tilt_pair_assignment import 
 from protocol_tilt_pair_assignment import XmippProtTiltPairAssignment
 from protocol_validate_nontilt import XmippProtValidateNonTilt
 from protocol_validate_overfitting import XmippProtValidateOverfitting
-from protocol_validate_tilt_pairs import XmippProtValidateTiltPairs
 from protocol_volume_strain import XmippProtVolumeStrain
 from protocol_volume_homogenizer import XmippProtVolumeHomogenizer
 from protocol_write_testC import XmippProtWriteTestC
