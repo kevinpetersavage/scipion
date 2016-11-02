@@ -526,8 +526,8 @@ void ProgAngularTiltPairAssignment::run()
 //		//Storing assignments into output metadata
 		MetaData mduntilt_output, mdtilt_output, md_union, md_union_aux;
 
-		FileName filnm_md_u = formatString("particles@%s", fnDir.c_str(), fnOutUntiltedAssign.c_str());
-		FileName filnm_md_t = formatString("particles@%s", fnDir.c_str(), fnOutTiltedAssign.c_str());
+		FileName filnm_md_u = formatString("particles@%s", fnOutUntiltedAssign.c_str());
+		FileName filnm_md_t = formatString("particles@%s", fnOutTiltedAssign.c_str());
 
 		md_union_aux = mdt_all;
 		md_union = mdu_all;

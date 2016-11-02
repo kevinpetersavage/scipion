@@ -29,7 +29,7 @@ from itertools import izip
 from pyworkflow.protocol.params import (PointerParam, BooleanParam, FloatParam, LEVEL_ADVANCED)
 from pyworkflow.utils.path import makePath, removeBaseExt
 from pyworkflow.em.data import SetOfParticles
-from pyworkflow.em.data_tiltpairs import TiltPair, CoordinatesTiltPair
+from pyworkflow.em.data_tiltpairs import TiltPair, CoordinatesTiltPair,ParticlesTiltPair
 
 from pyworkflow.em.metadata.constants import (MDL_ANGLE_Y, MDL_IMAGE, MDL_ANGLE_Y2, MDL_ANGLE_TILT, MDL_PARTICLE_ID, 
                                               MD_APPEND, MDL_MICROGRAPH_ID)
@@ -261,21 +261,32 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
         self._defineOutputs(outputUntiltedParticles=USet)
         self._defineSourceRelation(self.tilpairparticles.get(), USet)
-        
-        USet = self._createSetOfParticles("UntiltedVol2")
-        Upath = self._getExtraPath('vol2_untilted.xmd')
-        readSetOfParticles(Upath, USet)
-        USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
-        self._defineOutputs(outputUntiltedParticles=USet)
-        self._defineSourceRelation(self.tilpairparticles.get(), USet)
-       
-               
+         
         TSet = self._createSetOfParticles("TiltedVol1")
         Tpath = self._getExtraPath('vol1_tilted.xmd')
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
         self._defineOutputs(outputTiltedParticles=TSet)
         self._defineSourceRelation(self.tilpairparticles.get(), TSet)
+
+        #Define output ParticlesTiltPair 
+        outputset_TiltPair_vol1 = ParticlesTiltPair(filename=self._getPath('particles_pairs_vol1.sqlite'))
+        outputset_TiltPair_vol1.setTilted(TSet)
+        outputset_TiltPair_vol1.setUntilted(USet)
+        for imgU, imgT in izip(USet, TSet):
+            outputset_TiltPair_vol1.append(TiltPair(imgU, imgT))
+
+        #outputset_TiltPair_vol1.setCoordsPair(self.inputCoordinatesTiltedPairs.get())
+        self._defineOutputs(outputParticlesTiltPair_vol1=outputset_TiltPair_vol1)
+        self._defineSourceRelation(self.tilpairparticles, outputset_TiltPair_vol1)
+        
+
+        USet = self._createSetOfParticles("UntiltedVol2")
+        Upath = self._getExtraPath('vol2_untilted.xmd')
+        readSetOfParticles(Upath, USet)
+        USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
+        self._defineOutputs(outputUntiltedParticles=USet)
+        self._defineSourceRelation(self.tilpairparticles.get(), USet)
         
         TSet = self._createSetOfParticles("TiltedVol2")
         Tpath = self._getExtraPath('vol2_tilted.xmd')
@@ -283,6 +294,17 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
         self._defineOutputs(outputTiltedParticles=TSet)
         self._defineSourceRelation(self.tilpairparticles.get(), TSet)
+        
+        #Define output ParticlesTiltPair 
+        outputset_TiltPair_vol2 = ParticlesTiltPair(filename=self._getPath('particles_pairs_vol2.sqlite'))
+        outputset_TiltPair_vol2.setTilted(TSet)
+        outputset_TiltPair_vol2.setUntilted(USet)
+        for imgU, imgT in izip(USet, TSet):
+            outputset_TiltPair_vol2.append(TiltPair(imgU, imgT))
+
+        #outputset_TiltPair_vol2.setCoordsPair(self.inputCoordinatesTiltedPairs.get())
+        self._defineOutputs(outputParticlesTiltPair_vol2=outputset_TiltPair_vol2)
+        self._defineSourceRelation(self.tilpairparticles, outputset_TiltPair_vol2)
         
         
 
