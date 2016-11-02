@@ -256,14 +256,14 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
 
     def createOutputStep(self):
         USet = self._createSetOfParticles("UntiltedVol1")
-        Upath = self._getExtraPath('vol1_untilted.xmd')
+        Upath = self._getExtraPath('Untilted_assignment_vol1.xmd')
         readSetOfParticles(Upath, USet)
         USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
         self._defineOutputs(outputUntiltedParticles1=USet)
         self._defineSourceRelation(self.tilpairparticles.get(), USet)
          
         TSet = self._createSetOfParticles("TiltedVol1")
-        Tpath = self._getExtraPath('vol1_tilted.xmd')
+        Tpath = self._getExtraPath('Tilted_assignment_vol1.xmd')
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
         self._defineOutputs(outputTiltedParticles2=TSet)
@@ -282,14 +282,14 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         
 
         USet = self._createSetOfParticles("UntiltedVol2")
-        Upath = self._getExtraPath('vol2_untilted.xmd')
+        Upath = self._getExtraPath('Untilted_assignment_vol2.xmd')
         readSetOfParticles(Upath, USet)
         USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
         self._defineOutputs(outputUntiltedParticles3=USet)
         self._defineSourceRelation(self.tilpairparticles.get(), USet)
         
         TSet = self._createSetOfParticles("TiltedVol2")
-        Tpath = self._getExtraPath('vol2_tilted.xmd')
+        Tpath = self._getExtraPath('Tilted_assignment_vol1.xmd')
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
         self._defineOutputs(outputTiltedParticles4=TSet)
