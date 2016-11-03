@@ -116,26 +116,12 @@ void ProgClassifyTiltPairs::run()
 	mdTilted1_sorted.sort(mdTilted1, MDL_PARTICLE_ID);
 	mdTilted2_sorted.sort(mdTilted2, MDL_PARTICLE_ID);
 
-//	FOR_ALL_OBJECTS_IN_METADATA(mdUntilted1_sorted)
-//	{
-//		mdUntilted1_sorted.getRow(mdUntilted1_row, __iter.objId);
-//		mdTilted1_sorted.getRow(mdTilted1_row, __iter.objId);
-//		mdUntilted2_sorted.getRow(mdUntilted2_row, __iter.objId);
-//		mdTilted2_sorted.getRow(mdUntilted2_row, __iter.objId);
-//
-//		mdUntilted1_sorted.getValue(MDL_PARTICLE_ID, particle_1, __iter.objId);
-//		mdTilted1_sorted.getValue(MDL_PARTICLE_ID, particle_2, __iter.objId);
-//		mdUntilted2_sorted.getValue(MDL_PARTICLE_ID, particle_3, __iter.objId);
-//		mdTilted2_sorted.getValue(MDL_PARTICLE_ID, particle_4, __iter.objId);
-//
-//
-//	}
 	for (size_t k = 0; k<len; k++)
 	{
 		mdUntilted1_sorted.getRow(mdUntilted1_row, objId);
 		mdTilted1_sorted.getRow(mdTilted1_row, objId);
 		mdUntilted2_sorted.getRow(mdUntilted2_row, objId);
-		mdTilted2_sorted.getRow(mdUntilted2_row, objId);
+		mdTilted2_sorted.getRow(mdTilted2_row, objId);
 
 		mdUntilted1_sorted.getValue(MDL_PARTICLE_ID, particle_1, objId);
 		mdTilted1_sorted.getValue(MDL_PARTICLE_ID, particle_2, objId);

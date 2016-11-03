@@ -332,7 +332,8 @@ void ProgAngularTiltPairAssignment::run()
 
 	//synchronize();
 	idx_mpi = 0;
-	size_t objId_un, objId_t;
+	size_t objId_un, objId_t, ensure_assignment=0;
+	bool flag_disable =false;
 
 	FOR_ALL_OBJECTS_IN_METADATA2(mduntilt_exp, mdtilt_exp)
 	{
@@ -376,7 +377,16 @@ void ProgAngularTiltPairAssignment::run()
 					corr1 = alignImages(imgGallery_orig, galleryTransform_[j], ImgUn_exp_copy2, transformation_matrix, true, aux_u, aux2, aux3);
 
 					if ((fabs(MAT_ELEM(transformation_matrix, 0, 2)) > maxshift) || (fabs(MAT_ELEM(transformation_matrix, 1, 2)) > maxshift))
-						continue;
+						ensure_assignment++;
+						if (ensure_assignment == len_p)
+						{
+							ensure_assignment = 0;
+							flag_disable = 1;
+						}
+						else
+						{
+							continue;
+						}
 
 					if ((corr1 <0.7*bestcorr1) || (corr1<0))
 						continue;
@@ -424,6 +434,10 @@ void ProgAngularTiltPairAssignment::run()
 							mdPartial_u.setValue(MDL_MAXCC, corr1, objId_un);
 							mdPartial_u.setValue(MDL_SHIFT_X, -MAT_ELEM(transformation_matrix,0,2), objId_un);
 							mdPartial_u.setValue(MDL_SHIFT_Y, -MAT_ELEM(transformation_matrix,1,2), objId_un);
+							if (flag_disable == true)
+								mdPartial_u.setValue(MDL_ENABLED, 0, objId_un);
+							else
+								mdPartial_u.setValue(MDL_ENABLED, 1, objId_un);
 
 //							objId_t = mdPartial_t.addObject();
 							mdPartial_t.setValue(MDL_IMAGE, fntilt_exp, objId_t);
@@ -434,6 +448,10 @@ void ProgAngularTiltPairAssignment::run()
 							mdPartial_t.setValue(MDL_MAXCC, corr2, objId_t);
 							mdPartial_t.setValue(MDL_SHIFT_X, -VEC_ELEM(Shiftvec,0), objId_t);
 							mdPartial_t.setValue(MDL_SHIFT_Y, -VEC_ELEM(Shiftvec,1), objId_t);
+							if (flag_disable == true)
+								mdPartial_t.setValue(MDL_ENABLED, 0, objId_un);
+							else
+								mdPartial_t.setValue(MDL_ENABLED, 1, objId_un);
 
 
 							#ifdef DEBUG
