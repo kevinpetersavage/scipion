@@ -456,6 +456,8 @@ void ProgAngularTiltPairAssignment::run()
 							else
 								mdPartial_t.setValue(MDL_ENABLED, 1, objId_un);
 
+							flag_disable = false;
+
 
 							#ifdef DEBUG
 												//UNTILTED PARTICLE
