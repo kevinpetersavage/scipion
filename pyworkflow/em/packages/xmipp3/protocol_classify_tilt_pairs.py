@@ -289,7 +289,7 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         self._defineSourceRelation(self.tilpairparticles.get(), USet)
         
         TSet = self._createSetOfParticles("TiltedVol2")
-        Tpath = self._getExtraPath('Tilted_assignment_vol1.xmd')
+        Tpath = self._getExtraPath('Tilted_assignment_vol2.xmd')
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
         self._defineOutputs(outputTiltedParticles4=TSet)
