@@ -20,12 +20,12 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'xmipp@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
 
+import os
 import webbrowser
-
 import Tkinter as tk
 import tkFont
 
@@ -49,17 +49,18 @@ class ProjectBaseWindow(Window):
     It extends from Window and add some layout functions (header and footer)
     """
     def __init__(self, title, masterWindow=None, weight=True, minsize=(900, 500),
-                 icon="scipion_bn.xbm", **args):
+                 icon="scipion_bn.xbm", **kwargs):
         Window.__init__(self, title, masterWindow, weight=weight, 
-                        icon=icon, minsize=minsize, enableQueue=True)
+                        icon=icon, minsize=minsize, enableQueue=True, **kwargs)
         
         content = tk.Frame(self.root)
         content.columnconfigure(0, weight=1)
         content.rowconfigure(1, weight=1)
         content.grid(row=0, column=0, sticky='news')
         self.content = content
-        
-        Window.createMainMenu(self, self.menuCfg)
+
+        if getattr(self, 'menuCfg', None):
+            Window.createMainMenu(self, self.menuCfg)
         
         self.header = self.createHeaderFrame(content)
         self.header.grid(row=0, column=0, sticky='new')
@@ -89,16 +90,23 @@ class ProjectBaseWindow(Window):
         logoImg = self.getImage(self.generalCfg.logo.get())
         logoLabel = tk.Label(header, image=logoImg, 
                              borderwidth=0, anchor='nw', bg='white')
-        logoLabel.grid(row=0, column=0, sticky='nw', padx=5, pady=5)
+        logoLabel.grid(row=0, column=0, sticky='nw', padx=(5, 0), pady=5)
+        versionLabel = tk.Label(header, text=os.environ['SCIPION_VERSION'],
+                                bg='white')
+        versionLabel.grid(row=0, column=1, sticky='sw', pady=20)
         
         # Create the Project Name label
         self.projNameFont = tkFont.Font(size=-28, family='helvetica')
-        projLabel = tk.Label(header, text=self.projName if 'projName' in locals() else "", font=self.projNameFont,
-                             borderwidth=0, anchor='nw', bg='white', fg=Color.DARK_GREY_COLOR)
-        projLabel.grid(row=0, column=1, sticky='sw', padx=(20, 5), pady=10)
+        projName = getattr(self, 'projName', '')
+        projLabel = tk.Label(header, text=projName, font=self.projNameFont,
+                             borderwidth=0, anchor='nw', bg='white',
+                             fg=Color.DARK_GREY_COLOR)
+        projLabel.grid(row=0, column=2, sticky='sw', padx=(20, 5), pady=10)
         
         # Create gradient
-        GradientFrame(header, height=8, borderwidth=0).grid(row=1, column=0, columnspan=3, sticky='new')
+        GradientFrame(header, height=8, borderwidth=0).grid(row=1, column=0,
+                                                            columnspan=3,
+                                                            sticky='new')
 
         return header
 
@@ -132,7 +140,7 @@ class ProjectBaseWindow(Window):
             self.switchView(elementText)
 
     def switchView(self, newView):
-        # Destroy the previous view if existing:
+        # Destroy the previous view if exists:
         if self.viewWidget:
             self.viewWidget.grid_forget()
             self.viewWidget.destroy()
@@ -158,12 +166,12 @@ class ProjectBaseWindow(Window):
 
     def onOnlineHelp(self):
         # Help -> Online help
-        webbrowser.open_new("http://scipionwiki.cnb.csic.es/")
+        webbrowser.open_new("http://scipion.cnb.csic.es/docs/")
 
     def onAbout(self):
         # Help -> About
         self.showInfo("""
-[[http://scipionwiki.cnb.csic.es/][Scipion]] is an image processing framework to obtain 3D models of macromolecular complexes using Electron Microscopy.
+[[http://scipion.cnb.csic.es/][Scipion]] is an image processing framework to obtain 3D models of macromolecular complexes using Electron Microscopy.
 
 It integrates several software packages with a unified interface. This way you can combine them in a single workflow, while all the formats and conversions are taken care of automatically.
 

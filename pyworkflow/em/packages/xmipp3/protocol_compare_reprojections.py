@@ -25,20 +25,21 @@
 # **************************************************************************
 
 from math import floor
-from os.path import exists
+import os
 
 from pyworkflow.protocol.params import PointerParam, StringParam, FloatParam, BooleanParam
 from pyworkflow.protocol.constants import LEVEL_ADVANCED
+from pyworkflow.em.constants import ALIGN_PROJ
 from pyworkflow.utils.path import cleanPath
 from pyworkflow.em.protocol import ProtAnalysis3D
-from pyworkflow.em.data import SetOfClasses2D, Image, SetOfAverages,\
-    SetOfParticles
+from pyworkflow.em.data import SetOfClasses2D, Image, SetOfAverages, SetOfParticles, Class2D
 from pyworkflow.em.packages.xmipp3.convert import setXmippAttributes, xmippToLocation
 import pyworkflow.em.metadata as md
 from pyworkflow.protocol.constants import LEVEL_ADVANCED
 
 import xmipp
 from xmipp3 import ProjMatcher
+from pyworkflow.em.packages.xmipp3.convert import rowToAlignment
 
         
 class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
@@ -88,7 +89,7 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
                                      anglesFn, self.inputVolume.get().getDim()[0])
         else:
             anglesFn=self.imgsFn
-        self._insertFunctionStep("produceResiduals", vol.getFileName(), anglesFn, vol.getSamplingRate())
+        self._insertFunctionStep("produceResiduals", vol.getFileName(), anglesFn)
         self._insertFunctionStep("evaluateResiduals")
         self._insertFunctionStep("createOutputStep")
 
@@ -97,22 +98,27 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
         from convert import writeSetOfClasses2D, writeSetOfParticles
         imgSet = self.inputSet.get()
         if isinstance(imgSet, SetOfClasses2D):
-            writeSetOfClasses2D(imgSet, self.imgsFn, writeParticles=False)
+            writeSetOfClasses2D(imgSet, self.imgsFn, writeParticles=True)
         else:
             writeSetOfParticles(imgSet, self.imgsFn)
+        from pyworkflow.em.convert import ImageHandler
+        img = ImageHandler()
+        fnVol = self._getTmpPath("volume.vol")
+        img.convert(self.inputVolume.get(), fnVol)
+        xdim=self.inputVolume.get().getDim()[0]
+        if xdim!=self._getDimensions():
+            self.runJob("xmipp_image_resize","-i %s --dim %d"%(fnVol,self._getDimensions()))
     
-    def produceResiduals(self):
+    def produceResiduals(self, fnVol, fnAngles):
         anglesOutFn=self._getExtraPath("anglesCont.stk")
         residualsOutFn=self._getExtraPath("residuals.stk")
         projectionsOutFn=self._getExtraPath("projections.stk")
         xdim=self.inputVolume.get().getDim()[0]
         originalTs=self.inputVolume.get().getSamplingRate()
-        Ts=originalTs*xdim/float(self.residualSize.get())
+        Ts=xdim*originalTs/self._getDimensions()
         self.runJob("xmipp_angular_continuous_assign2", "-i %s -o %s --ref %s --optimizeAngles --optimizeGray --optimizeShift --max_shift %d --oresiduals %s --oprojections %s --sampling %f" %\
-                    (self._getExtraPath('images.xmd'),anglesOutFn,self._getExtraPath("volume.vol"),floor(xdim*0.05),residualsOutFn,projectionsOutFn,Ts))
-        fnNewParticles=self._getExtraPath("images.stk")
-        if exists(fnNewParticles):
-            cleanPath(fnNewParticles)
+                    (fnAngles,anglesOutFn,self._getTmpPath("volume.vol"),floor(xdim*0.05),residualsOutFn,projectionsOutFn,Ts))
+
     
     def evaluateResiduals(self):
         # Evaluate each image
@@ -127,17 +133,25 @@ class XmippProtCompareReprojections(ProtAnalysis3D, ProjMatcher):
     
     def createOutputStep(self):
         fnImgs = self._getExtraPath('images.stk')
-        if exists(fnImgs):
+        if os.path.exists(fnImgs):
             cleanPath(fnImgs)
 
         outputSet = self._createSetOfParticles()
         imgSet = self.inputSet.get()
         imgFn = self._getExtraPath("anglesCont.xmd")
+        self.newAssignmentPerformed = os.path.exists(self._getExtraPath("angles.xmd"))
+        self.samplingRate = self.inputSet.get().getSamplingRate()
         if isinstance(imgSet, SetOfClasses2D):
+            outputSet = self._createSetOfClasses2D(imgSet)
             outputSet.copyInfo(imgSet.getImages())
-        else:
+        elif isinstance(imgSet, SetOfAverages):
+            outputSet = self._createSetOfAverages()
             outputSet.copyInfo(imgSet)
-        outputSet.setAlignmentProj()
+        else:
+            outputSet = self._createSetOfParticles()
+            outputSet.copyInfo(imgSet)
+            if not self.newAssignmentPerformed:
+                outputSet.setAlignmentProj()
         outputSet.copyItems(imgSet,
                             updateItemCallback=self._processRow,
                             itemDataIterator=md.iterRows(imgFn, sortByLabel=md.MDL_ITEM_ID))

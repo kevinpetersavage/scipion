@@ -28,10 +28,13 @@ This module implement the first version of viewers using
 around xmipp_showj visualization program.
 """
 import os
+
+from pyworkflow.gui.project import ProjectWindow
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER,
                                WEB_DJANGO, Viewer)
 from pyworkflow.em.packages.xmipp3.viewer import XmippViewer
-import pyworkflow.em as em
+import pyworkflow.em.showj as showj
+import pyworkflow.em.viewer as vw
 from pyworkflow.em.plotter import EmPlotter
 from pyworkflow.protocol.constants import LEVEL_ADVANCED
 from pyworkflow.protocol.params import (LabelParam, NumericRangeParam,
@@ -61,6 +64,12 @@ HALF_ODD = 1
 FULL_MAP = 2
 ALL_MAPS = 3
 
+OBJCMD_CLASSAVG_PROJS = 'Show class-averages/projections'
+OBJCMD_PROJS = 'Show only projections'
+OBJCMD_INITVOL = 'Show initial random volume'
+
+
+
 class EmanViewer(XmippViewer):
     """ Wrapper to visualize different type of objects
     with the Xmipp program xmipp_showj
@@ -76,7 +85,40 @@ class EmanViewer(XmippViewer):
                 XmippViewer._visualize(self, obj.outputCoordinates)
              
         elif isinstance(obj, EmanProtInitModel):
-            XmippViewer._visualize(self, obj.outputVolumes)
+            obj = obj.outputVolumes
+            fn = obj.getFileName()
+            labels = 'id enabled comment _filename '
+            objCommands = "'%s' '%s' '%s'" % (OBJCMD_CLASSAVG_PROJS,
+                                              OBJCMD_PROJS,
+                                              OBJCMD_INITVOL)
+
+            self._views.append(vw.ObjectView(self._project, obj.strId(), fn,
+                                          viewParams={showj.MODE: showj.MODE_MD,
+                                                      showj.ORDER: labels,
+                                                      showj.VISIBLE: labels,
+                                                      showj.RENDER: '_filename',
+                                                      showj.OBJCMDS: objCommands},
+                                             ))
+
+
+def showExtraFile(volumeSet, volId, suffix):
+    vol = volumeSet[volId]
+    volFn = vol.getFileName().replace('.hdf', suffix)
+    vw.DataView(volFn).show()
+
+def showClassAvgProjs(volumeSet, volId):
+    showExtraFile(volumeSet, volId, '_aptcl.hdf')
+
+def showProjs(volumeSet, volId):
+    showExtraFile(volumeSet, volId, '_proj.hdf')
+
+def showInitialRandomVolume(volumeSet, volId):
+    showExtraFile(volumeSet, volId, '_init.hdf')
+
+
+ProjectWindow.registerObjectCommand(OBJCMD_CLASSAVG_PROJS, showClassAvgProjs)
+ProjectWindow.registerObjectCommand(OBJCMD_PROJS, showProjs)
+ProjectWindow.registerObjectCommand(OBJCMD_INITVOL, showInitialRandomVolume)
 
 
 class RefineEasyViewer(ProtocolViewer):
@@ -89,7 +131,8 @@ class RefineEasyViewer(ProtocolViewer):
     def _defineParams(self, form):
         self._env = os.environ.copy()
         form.addSection(label='Results per Iteration')
-        form.addParam('iterToShow', EnumParam, label="Which iteration do you want to visualize?", default=0, 
+        form.addParam('iterToShow', EnumParam,
+                      label="Which iteration do you want to visualize?", default=0,
                       choices=['last','all','selection'], display=EnumParam.DISPLAY_LIST)
         form.addParam('iterSelection', NumericRangeParam, default='1',
               label='Selected iterations', condition='iterToShow==%d' % SELECTED_ITERS,
@@ -109,16 +152,18 @@ Examples:
         
         group = form.addGroup('Volumes')
         
+        group.addParam('showHalves', EnumParam,
+                       choices=['half even', 'half odd', 'full map', 'all maps'],
+                       default=HALF_EVEN,
+              label='Map to visualize',
+              help='Select which map do you want to visualize.')
         group.addParam('displayVol', EnumParam, choices=['slices', 'chimera'], 
-              default=VOLUME_SLICES, display=EnumParam.DISPLAY_COMBO, 
+              default=VOLUME_SLICES, display=EnumParam.DISPLAY_HLIST,
               label='Display volume with',
               help='*slices*: display volumes as 2D slices along z axis.\n'
                    '*chimera*: display volumes as surface with Chimera.')
-        group.addParam('showHalves', EnumParam, choices=['half even', 'half odd', 'full map', 'all maps'], default=HALF_EVEN,
-              label='Map to visualize',
-              help='Select which map do you want to visualize.')
         group.addParam('displayAngDist', EnumParam, choices=['2D plot', 'chimera'], 
-              default=ANGDIST_2DPLOT, display=EnumParam.DISPLAY_COMBO, 
+              default=ANGDIST_2DPLOT, display=EnumParam.DISPLAY_HLIST, 
               label='Display angular distribution',
               help='*2D plot*: display angular distribution as interative 2D in matplotlib.\n'
                    '*chimera*: display angular distribution using Chimera with red spheres.') 
@@ -126,7 +171,7 @@ Examples:
               expertLevel=LEVEL_ADVANCED,
               label='Spheres size',
               help='')
-
+        
         group = form.addGroup('Resolution')
         
         group.addParam('resolutionPlotsFSC', EnumParam, choices=['unmasked', 'masked', 'masked tight', 'all'], 
@@ -144,7 +189,7 @@ Examples:
     def _getVisualizeDict(self):
         self._load()
         return {'showImagesAngularAssignment' : self._showImagesAngularAssignment,
-                'showHalves': self._showVolumes,
+                'displayVol': self._showVolumes,
                 'displayAngDist': self._showAngularDistribution,
                 'resolutionPlotsFSC': self._showFSC
                 }
@@ -167,11 +212,11 @@ Examples:
         inputParticlesId = self.protocol.inputParticles.get().strId()
         
         labels =  'enabled id _size _filename _transform._matrix'
-        viewParams = {em.ORDER:labels,
-                      em.VISIBLE: labels, em.RENDER:'_filename',
+        viewParams = {showj.ORDER:labels,
+                      showj.VISIBLE: labels, showj.RENDER:'_filename',
                       'labels': 'id',
                       }
-        return em.ObjectView(self._project, 
+        return vw.ObjectView(self._project, 
                           self.protocol.strId(), filename, other=inputParticlesId,
                           env=self._env, viewParams=viewParams)
     
@@ -199,9 +244,9 @@ Examples:
                     f.write("open %s\n" % localVol)
             f.write('tile\n')
             f.close()
-            view = em.ChimeraView(cmdFile)
+            view = vw.ChimeraView(cmdFile)
         else:
-            view = em.ChimeraClientView(volumes[0])
+            view = vw.ChimeraClientView(volumes[0])
             
         return [view]
     
@@ -217,7 +262,7 @@ Examples:
             if os.path.exists(vol):
                 files.append(vol)
         self.createVolumesSqlite(files, path, samplingRate)
-        return [em.ObjectView(self._project, self.protocol.strId(), path)]
+        return [vw.ObjectView(self._project, self.protocol.strId(), path)]
     
 #===============================================================================
 # showAngularDistribution
@@ -262,7 +307,7 @@ Examples:
             else:
                 raise Exception("Please, select a single volume to show it's angular distribution")
             
-            view = em.ChimeraClientView(volumes[0], showProjection=True, angularDistFile=sqliteFn, spheresDistance=radius)
+            view = vw.ChimeraClientView(volumes[0], showProjection=True, angularDistFile=sqliteFn, spheresDistance=radius)
         return view
     
     def _createAngDist2D(self, it):

@@ -94,7 +94,7 @@ Examples:
                       help='Number of bins in histograms')
 
         group = form.addGroup('Volumes')
-        group.addParam('displayVolume', EnumParam, choices=['Reference', 'Reconstructed'],
+        group.addParam('displayVolume', EnumParam, choices=['Reference', 'Reconstructed','Two processed halves', 'Two unprocessed halves'],
                        default=1, display=EnumParam.DISPLAY_COMBO,
                        label='Display volume',
                        help='Displays selected volume')
@@ -177,12 +177,17 @@ Examples:
                     fnDir = join(fnDir,'globalAssignment')
                 else:
                     fnDir = join(fnDir,'localAssignment')
-                fnVolume = join(fnDir,"volumeRef01.vol")
+                fnVolumes = [join(fnDir,"volumeRef01.vol"),join(fnDir,"volumeRef02.vol")]
             elif choice == 1:
-                fnVolume = join(fnDir,"volumeAvg.mrc")
-            if exists(fnVolume):
-                samplingRate=self.protocol.readInfoField(fnDir,"sampling",MDL_SAMPLINGRATE)
-                views.append(ObjectView(self._project, None, fnVolume, viewParams={showj.RENDER: 'image', showj.SAMPLINGRATE: samplingRate}))
+                fnVolumes = [join(fnDir,"volumeAvg.mrc")]
+            elif choice == 2:
+                fnVolumes = [join(fnDir,"volume01.vol"),join(fnDir,"volume02.vol")]
+            elif choice == 3:
+                fnVolumes = [join(fnDir,"volumeBeforePostProcessing01.vol"),join(fnDir,"volumeBeforePostProcessing02.vol")]
+            for fnVolume in fnVolumes:
+                if exists(fnVolume):
+                    samplingRate=self.protocol.readInfoField(fnDir,"sampling",MDL_SAMPLINGRATE)
+                    views.append(ObjectView(self._project, None, fnVolume, viewParams={showj.RENDER: 'image', showj.SAMPLINGRATE: samplingRate}))
         return views
 
     def _showOutputParticles(self, paramName=None):

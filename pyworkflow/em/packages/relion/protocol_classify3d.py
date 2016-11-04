@@ -46,7 +46,8 @@ class ProtRelionClassify3D(ProtClassify3D, ProtRelionBase):
     """
     _label = '3D classification'
     CHANGE_LABELS = [md.RLN_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, 
-                     md.RLN_OPTIMISER_CHANGES_OPTIMAL_OFFSETS]
+                     md.RLN_OPTIMISER_CHANGES_OPTIMAL_OFFSETS,
+                     md.RLN_OPTIMISER_CHANGES_OPTIMAL_CLASSES]
     
     def __init__(self, **args):        
         ProtRelionBase.__init__(self, **args)
@@ -180,7 +181,7 @@ class ProtRelionClassify3D(ProtClassify3D, ProtRelionBase):
     
     def _updateParticle(self, item, row):
         item.setClassId(row.getValue(md.RLN_PARTICLE_CLASS))
-        item.setTransform(rowToAlignment(row, em.ALIGN_3D))
+        item.setTransform(rowToAlignment(row, em.ALIGN_PROJ))
         
         item._rlnLogLikeliContribution = em.Float(row.getValue('rlnLogLikeliContribution'))
         item._rlnMaxValueProbDistribution = em.Float(row.getValue('rlnMaxValueProbDistribution'))

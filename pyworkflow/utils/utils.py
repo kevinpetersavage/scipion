@@ -20,18 +20,16 @@
 # * 02111-1307  USA
 # *
 # *  All comments concerning this program package may be sent to the
-# *  e-mail address 'jmdelarosa@cnb.csic.es'
+# *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This module contains utilities functions and classes.
-"""
 
 import sys
 import os
 import re
 from datetime import datetime
 import traceback
+import numpy as np
 
 
 def prettyDate(time=False):
@@ -79,7 +77,7 @@ def prettyDate(time=False):
     return str(day_diff/365) + " years ago"
 
 
-def dateStr(dt=None, time=True, secs=False):
+def dateStr(dt=None, time=True, secs=False, dateFormat=None):
     """ Get a normal string representation of datetime. 
     If dt is None, use NOW.
     """
@@ -87,14 +85,24 @@ def dateStr(dt=None, time=True, secs=False):
         dt = datetime.now()
     elif isinstance(dt, float) or isinstance(dt, int):
         dt = datetime.fromtimestamp(dt)
-    dateFormat = '%d-%m-%Y'
-    if time:
-        dateFormat += ' %H:%M'
-        if secs:
-            dateFormat += ':%S'
+
+    if dateFormat is None:
+        dateFormat = '%d-%m-%Y'
+        if time:
+            dateFormat += ' %H:%M'
+            if secs:
+                dateFormat += ':%S'
+
     return dt.strftime(dateFormat)
 
 prettyTime = dateStr
+
+
+def prettyTimestamp(dt=None, format='%Y-%m-%d_%H%M%S'):
+    if dt is None:
+        dt = datetime.now()
+
+    return dt.strftime(format)
 
 
 def prettySize(size):
@@ -360,7 +368,7 @@ In particular:
 HYPER_BOLD = 'bold'
 HYPER_ITALIC = 'italic'
 HYPER_LINK1 = 'link1'
-HYPER_SCIOPEN = 'sciopen'
+HYPER_SCIPION_OPEN = 'sci-open'
 HYPER_LINK2 = 'link2'
 HYPER_ALL = 'all'
 
@@ -414,15 +422,21 @@ def parseHyperText(text, matchCallback):
 #    return text
 
 def parseBibTex(bibtexStr):
-    """ Parse a bibtex file and return a dictioray. """
+    """ Parse a bibtex file and return a dictionary. """
+    import bibtexparser
+
+    if hasattr(bibtexparser, 'loads'):
+        return bibtexparser.loads(bibtexStr).entries_dict
+
+    # For older bibtexparser version 0.5
     from bibtexparser.bparser import BibTexParser
     from StringIO import StringIO
-    
+
     f = StringIO()
     f.write(bibtexStr)
     f.seek(0, 0)
     parser = BibTexParser(f)
-    
+
     return parser.get_entry_dict()
 
 
@@ -615,3 +629,23 @@ def readProperties(propsFile):
             k, v = line.split("=", 1)
             myprops[k] = v
     return myprops
+
+
+# ---------------------Color utils --------------------------
+def hex_to_rgb(value):
+    value = value.lstrip('#')
+    lv = len(value)
+    return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+
+
+def rgb_to_hex(rgb):
+    return '#%02x%02x%02x' % rgb
+
+
+def lighter(color, percent):
+    '''assumes color is rgb between (0, 0, 0) and (255, 255, 255)'''
+    color = np.array(color)
+    white = np.array([255, 255, 255])
+    vector = white - color
+    return tuple(np.around(color + vector * percent))
+

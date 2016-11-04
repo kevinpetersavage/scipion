@@ -28,11 +28,12 @@ Protocol to split a volume in two volumes based on a set of images
 """
 
 from pyworkflow.protocol.constants import LEVEL_ADVANCED
-from pyworkflow.protocol.params import PointerParam, FloatParam, IntParam
+from pyworkflow.protocol.params import PointerParam, FloatParam, IntParam, StringParam
 from pyworkflow.em.protocol import ProtClassify3D
 from pyworkflow.em.data import Volume
 from pyworkflow.em.convert import ImageHandler
 from pyworkflow.em.packages.xmipp3.protocol_directional_classes import XmippProtDirectionalClasses
+from convert import writeSetOfParticles
 
 class XmippProtSplitvolume(ProtClassify3D):
     """Split volume in two"""
@@ -46,8 +47,12 @@ class XmippProtSplitvolume(ProtClassify3D):
         form.addSection(label='Input')
         
         form.addParam('directionalClasses', PointerParam, label="Directional classes", important=True, 
-                      pointerClass='XmippProtDirectionalClasses',
-                      help='Select a run of directional classes')
+                      pointerClass='SetOfParticles', pointerCondition='hasAlignmentProj',
+                      help='Select a set of particles with angles. Preferrably the output of a run of directional classes')
+        form.addParam('symmetryGroup', StringParam, default='c1',
+                      label="Symmetry group", 
+                      help='See [[Xmipp Symmetry][http://www2.mrc-lmb.cam.ac.uk/Xmipp/index.php/Conventions_%26_File_formats#Symmetry]] page '
+                           'for a description of the symmetry format accepted by Xmipp') 
         form.addParam('mask', PointerParam, label="Mask", pointerClass='VolumeMask', allowsNull=True,
                       help='The mask values must be binary: 0 (remove these voxels) and 1 (let them pass).')
         form.addParam('Nrec', IntParam, label="Number of reconstructions", default=5000, expertLevel=LEVEL_ADVANCED, 
@@ -59,12 +64,16 @@ class XmippProtSplitvolume(ProtClassify3D):
     
     #--------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
+        self._insertFunctionStep('convertInputStep',self.directionalClasses.getObjId())
         self._insertFunctionStep('generateSplittedVolumes')
         self._insertFunctionStep('createOutput')
 
     #--------------------------- STEPS functions ---------------------------------------------------
+    def convertInputStep(self, inputParticlesId):
+        writeSetOfParticles(self.directionalClasses.get(),self._getExtraPath("directionalClasses.xmd"))
+
     def createOutput(self):
-        inputParticles = self.directionalClasses.get().outputParticles
+        inputParticles = self.directionalClasses.get()
         volumesSet = self._createSetOfVolumes()
         volumesSet.setSamplingRate(inputParticles.getSamplingRate())
         for i in range(2):
@@ -76,9 +85,7 @@ class XmippProtSplitvolume(ProtClassify3D):
         self._defineSourceRelation(inputParticles, volumesSet)
         
     def generateSplittedVolumes(self):
-        dirProt = self.directionalClasses.get()
-        fnDirectional = dirProt._getPath("directionalClasses.xmd")
-        inputParticles = dirProt.outputParticles
+        inputParticles = self.directionalClasses.get()
         Xdim = inputParticles.getDimensions()[0]
         fnMask = ""
         if self.mask.hasValue():
@@ -89,8 +96,8 @@ class XmippProtSplitvolume(ProtClassify3D):
             self.runJob('xmipp_transform_threshold',"-i %s --select below 0.5 --substitute binarize"%fnMask,numberOfMpi=1)
 
         args="-i %s --oroot %s --Nrec %d --Nsamples %d --sym %s --alpha %f"%\
-             (fnDirectional,self._getExtraPath("split"),self.Nrec.get(),self.Nsamples.get(),
-              dirProt.symmetryGroup.get(), self.alpha.get())
+             (self._getExtraPath("directionalClasses.xmd"),self._getExtraPath("split"),self.Nrec.get(),self.Nsamples.get(),
+              self.symmetryGroup.get(), self.alpha.get())
         if fnMask!="":
             args+=" --mask binary_file %s"%fnMask
         self.runJob("xmipp_classify_first_split",args)

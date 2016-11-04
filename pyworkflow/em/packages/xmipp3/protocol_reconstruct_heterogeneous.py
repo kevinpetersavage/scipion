@@ -100,80 +100,58 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
     
     #--------------------------- STEPS functions ---------------------------------------------------
     def createOutput(self):
-        return
         # get last iteration
         fnIterDir=glob(self._getExtraPath("Iter*"))
         lastIter=len(fnIterDir)-1
-        fnLastDir=self._getExtraPath("Iter%03d"%lastIter)
-        fnLastVol=join(fnLastDir,"volumeAvg.mrc")
-        Ts=self.readInfoField(fnLastDir,"sampling",xmipp.MDL_SAMPLINGRATE)
-        if exists(fnLastVol):
-            volume=Volume()
-            volume.setFileName(fnLastVol)
-            volume.setSamplingRate(Ts)
-            self._defineOutputs(outputVolume=volume)
-            self._defineSourceRelation(self.inputParticles.get(),volume)
-            #self._defineSourceRelation(self.inputVolumes.get(),volume)
-            
-        fnLastAngles=join(fnLastDir,"angles.xmd")
-        if exists(fnLastAngles):
-            fnAngles=self._getPath("angles.xmd")
-            self.runJob('xmipp_metadata_utilities','-i %s -o %s --operate modify_values "image=image1"'%(fnLastAngles,fnAngles),numberOfMpi=1)
-            self.runJob('xmipp_metadata_utilities','-i %s --operate sort particleId'%fnAngles,numberOfMpi=1)
-            self.runJob('xmipp_metadata_utilities','-i %s --operate drop_column image1'%fnAngles,numberOfMpi=1)
-            self.runJob('xmipp_metadata_utilities','-i %s --operate modify_values "itemId=particleId"'%fnAngles,numberOfMpi=1)
-            imgSet = self.inputParticles.get()
-            self.scaleFactor=Ts/imgSet.getSamplingRate()
-            imgSetOut = self._createSetOfParticles()
-            imgSetOut.copyInfo(imgSet)
-            imgSetOut.setAlignmentProj()
-            self.iterMd = md.iterRows(fnAngles, md.MDL_PARTICLE_ID)
-            self.lastRow = next(self.iterMd) 
-            imgSetOut.copyItems(imgSet,
-                                updateItemCallback=self._updateItem)
-            self._defineOutputs(outputParticles=imgSetOut)
-            self._defineSourceRelation(self.inputParticles, imgSetOut)
+        self.fnLastDir=self._getExtraPath("Iter%03d"%lastIter)
 
-    def _updateItem(self, particle, row):
-        count = 0
+        fnLastImages=join(self.fnLastDir,"images.xmd")
+        if not exists(fnLastImages):
+            raise Exception("The file %s does not exist"%fnLastImages)
+        partSet = self.inputParticles.get()
+        self.Ts=self.readInfoField(self.fnLastDir,"sampling",xmipp.MDL_SAMPLINGRATE)
+        self.scaleFactor=self.Ts/partSet.getSamplingRate()
+
+        classes3D = self._createSetOfClasses3D(partSet)
+        # Let use an special iterator to skip missing particles
+        # discarded by classification (in case of cl2d)
+        setMdIter = md.SetMdIterator(fnLastImages,
+                                     sortByLabel=md.MDL_PARTICLE_ID,
+                                     updateItemCallback=self._updateParticle)
         
-        while self.lastRow and particle.getObjId() == self.lastRow.getValue(md.MDL_PARTICLE_ID):
-            count += 1
-            if count:
-                self._createItemMatrix(particle, self.lastRow)
-            try:
-                self.lastRow = next(self.iterMd)
-            except StopIteration:
-                self.lastRow = None
-                    
-        particle._appendItem = count > 0
+        classes3D.classifyItems(updateItemCallback=setMdIter.updateItem,
+                             updateClassCallback=self._updateClass)
+        self._defineOutputs(outputClasses=classes3D)
+        self._defineSourceRelation(self.inputParticles, classes3D)
+
+        # create a SetOfVolumes and define its relations
+        volumes = self._createSetOfVolumes()
+        volumes.setSamplingRate(self.Ts)
         
-    def _createItemMatrix(self, particle, row):
-        if row.containsLabel(xmipp.MDL_CONTINUOUS_X):
-            row.setValue(xmipp.MDL_SHIFT_X,row.getValue(xmipp.MDL_CONTINUOUS_X))
-            row.setValue(xmipp.MDL_SHIFT_Y,row.getValue(xmipp.MDL_CONTINUOUS_Y))
+        for class3D in classes3D:
+            vol = class3D.getRepresentative()
+            vol.setObjId(class3D.getObjId())
+            volumes.append(vol)
+        
+        self._defineOutputs(outputVolumes=volumes)
+        self._defineSourceRelation(self.inputParticles, volumes)
+
+    def _updateParticle(self, particle, row):
+        particle.setClassId(row.getValue(md.MDL_REF3D))
         row.setValue(xmipp.MDL_SHIFT_X,row.getValue(xmipp.MDL_SHIFT_X)*self.scaleFactor)
         row.setValue(xmipp.MDL_SHIFT_Y,row.getValue(xmipp.MDL_SHIFT_Y)*self.scaleFactor)
-        setXmippAttributes(particle, row, xmipp.MDL_SHIFT_X, xmipp.MDL_SHIFT_Y, xmipp.MDL_ANGLE_TILT, xmipp.MDL_SCALE, xmipp.MDL_MAXCC, xmipp.MDL_MAXCC_PERCENTILE, xmipp.MDL_WEIGHT)
-        if row.containsLabel(xmipp.MDL_ANGLE_DIFF0):
-            setXmippAttributes(particle, row, xmipp.MDL_ANGLE_DIFF0, xmipp.MDL_WEIGHT_JUMPER0)
-        if row.containsLabel(xmipp.MDL_CONTINUOUS_X):
-            setXmippAttributes(particle, row, xmipp.MDL_COST, xmipp.MDL_WEIGHT_CONTINUOUS2, 
-                               xmipp.MDL_CONTINUOUS_SCALE_X, xmipp.MDL_CONTINUOUS_SCALE_Y, xmipp.MDL_COST_PERCENTILE,
-                               xmipp.MDL_CONTINUOUS_GRAY_A, xmipp.MDL_CONTINUOUS_GRAY_B)
-        if row.containsLabel(xmipp.MDL_ANGLE_DIFF):
-            setXmippAttributes(particle, row, xmipp.MDL_ANGLE_DIFF, xmipp.MDL_WEIGHT_JUMPER)
-        if row.containsLabel(xmipp.MDL_ANGLE_DIFF2):
-            setXmippAttributes(particle, row, xmipp.MDL_ANGLE_DIFF2, xmipp.MDL_WEIGHT_JUMPER2)
-        if row.containsLabel(xmipp.MDL_WEIGHT_SSNR):
-            setXmippAttributes(particle, row, xmipp.MDL_WEIGHT_SSNR)
+        setXmippAttributes(particle, row, xmipp.MDL_SHIFT_X, 
+                           xmipp.MDL_SHIFT_Y, xmipp.MDL_ANGLE_ROT, 
+                           xmipp.MDL_ANGLE_TILT, xmipp.MDL_ANGLE_PSI, 
+                           xmipp.MDL_MAXCC, xmipp.MDL_WEIGHT)
         createItemMatrix(particle, row, align=em.ALIGN_PROJ)
 
-    def getLastFinishedIter(self):
-        fnVolumes=sorted(glob(self._getExtraPath("Iter???/volumes.xmd")))
-        lastDir=split(fnVolumes[-1])[0]
-        return int(lastDir[-3:])
-    
+    def _updateClass(self, item):
+        classId = item.getObjId()
+        item.setAlignment3D()
+        item.setSamplingRate(self.Ts)
+        item.getRepresentative().setFileName(join(self.fnLastDir,"volume%02d.vol"%classId))
+        
     def doIteration000(self, inputVolumesId):
         fnDirCurrent=self._getExtraPath('Iter000')
         makePath(fnDirCurrent)
@@ -230,9 +208,9 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
         
         if iteration>1:
             fnDirPrevious=self._getExtraPath("Iter%03d"%(iteration-1))
-            for i in range(1,self.getNumberOfReconstructedVolumes()+1):
-                fnCurrent=join(fnDirCurrent,"globalAssignment","images_iter001_%02d.xmd"%(i-1))
-                fnPrevious=join(fnDirPrevious,"globalAssignment","images_iter001_%02d.xmd"%(i-1))
+            for i in range(0,self.getNumberOfReconstructedVolumes()):
+                fnCurrent=join(fnDirCurrent,"images%02d.xmd"%(i+1))
+                fnPrevious=join(fnDirPrevious,"images%02d.xmd"%(i+1))
                 fnIntersection=self._getExtraPath("intersection.xmd")
                 fnUnion=self._getExtraPath("union.xmd")
                 self.runJob("xmipp_metadata_utilities","-i %s --set intersection %s itemId -o %s"%(fnCurrent,fnPrevious,fnIntersection),numberOfMpi=1)
@@ -241,7 +219,7 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
                 sizeIntersection = float(md.getSize(fnIntersection))
                 sizeUnion = float(md.getSize(fnUnion))
                 
-                print("Stability of class %d: %f"%(i,sizeIntersection/sizeUnion))
+                print("Stability of class %d: %f"%(i+1,sizeIntersection/sizeUnion))
                 cleanPath(fnIntersection)
                 cleanPath(fnUnion)                
 
@@ -319,14 +297,24 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
             fnAngles=join(fnDirCurrent,"angles%02d.xmd"%i)
             fnSignificant=join(fnGlobal,"angles_iter001_%02d.xmd"%(i-1))
             moveFile(fnSignificant, fnAngles)
+            self.runJob('xmipp_metadata_utilities',"-i %s --fill ref3d constant %d"%(fnAngles,i),numberOfMpi=1)
+            
+            fnImages=join(fnDirCurrent,"images%02d.xmd"%i)
+            fnSignificant=join(fnGlobal,"images_iter001_%02d.xmd"%(i-1))
+            moveFile(fnSignificant, fnImages)
+            self.runJob('xmipp_metadata_utilities',"-i %s --fill ref3d constant %d"%(fnImages,i),numberOfMpi=1)
+
             cleanPath(join(fnGlobal,"images_significant_iter001_%02d.xmd"%(i-1)))
         if self.saveSpace:
             self.runJob("rm -f",fnGlobal+"/gallery*",numberOfMpi=1)
             
     def weightParticles(self, iteration):
         fnDirCurrent=self._getExtraPath("Iter%03d"%iteration)
+        fnGeneralAngles=join(fnDirCurrent,"angles.xmd")
+        fnGeneralImages=join(fnDirCurrent,"images.xmd")
         for i in range(1,self.getNumberOfReconstructedVolumes()+1):
             fnAngles=join(fnDirCurrent,"angles%02d.xmd"%i)
+            fnImages=join(fnDirCurrent,"images%02d.xmd"%i)
                 
             if self.weightSSNR:
                 row=getFirstRow(fnAngles)
@@ -342,13 +330,14 @@ class XmippProtReconstructHeterogeneous(ProtClassify3D, XmippProtBaseReconstruct
                     aux=mdAngles.getValue(xmipp.MDL_WEIGHT_SSNR,objId)
                     weight*=aux
                 mdAngles.setValue(xmipp.MDL_WEIGHT,weight,objId)
-                mdAngles.setValue(xmipp.MDL_REF3D,i,objId)
             mdAngles.write(fnAngles)
             
-        fnAngles=join(fnDirCurrent,"angles.xmd")
-        fnAngles1=join(fnDirCurrent,"angles01.xmd")
-        fnAngles2=join(fnDirCurrent,"angles02.xmd")
-        self.runJob('xmipp_metadata_utilities',"-i %s --set union %s -o %s"%(fnAngles1,fnAngles2,fnAngles),numberOfMpi=1)
+            if i==1:
+                copyFile(fnAngles,fnGeneralAngles)
+                copyFile(fnImages,fnGeneralImages)
+            else:
+                self.runJob('xmipp_metadata_utilities',"-i %s --set union_all %s"%(fnGeneralAngles,fnAngles),numberOfMpi=1)
+                self.runJob('xmipp_metadata_utilities',"-i %s --set union_all %s"%(fnGeneralImages,fnImages),numberOfMpi=1)
 
     def reconstruct(self, iteration):
         fnDirCurrent=self._getExtraPath("Iter%03d"%iteration)
