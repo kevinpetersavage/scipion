@@ -552,6 +552,7 @@ void ProgAngularTiltPairAssignment::run()
 		FileName filnm_md_u = formatString("particles@%s", fnOutUntiltedAssign.c_str());
 		FileName filnm_md_t = formatString("particles@%s", fnOutTiltedAssign.c_str());
 
+		std::cout << "Angular assignment finished" << std::endl;
 		md_union_aux = mdt_all;
 		md_union = mdu_all;
 
