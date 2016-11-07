@@ -342,14 +342,16 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
 
     def createOutputStep(self):
         USet = self._createSetOfParticles("UntiltedVol1")
-        Upath = self._getExtraPath('Untilted_classification_vol1_iter_%d.xmd', self.iters.get())
+        Upath = self._getExtraPath('Untilted_classification_vol1_iter_%d.xmd', int(self.iters.get()))
+        print Upath
         readSetOfParticles(Upath, USet)
         USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
         self._defineOutputs(outputUntiltedParticles1=USet)
         self._defineSourceRelation(self.tilpairparticles.get(), USet)
          
         TSet = self._createSetOfParticles("TiltedVol1")
-        Tpath = self._getExtraPath('Tilted_classification_vol1_iter_%d.xmd', self.iters.get())
+        Tpath = self._getExtraPath('Tilted_classification_vol1_iter_%d.xmd', int(self.iters.get()))
+        print Tpath
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
         self._defineOutputs(outputTiltedParticles2=TSet)
@@ -368,14 +370,16 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         
 
         USet = self._createSetOfParticles("UntiltedVol2")
-        Upath = self._getExtraPath('Untilted_classification_vol2_iter_%d.xmd', self.iters.get())
+        Upath = self._getExtraPath('Untilted_classification_vol2_iter_%d.xmd', int(self.iters.get()))
+        print Upath
         readSetOfParticles(Upath, USet)
         USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
         self._defineOutputs(outputUntiltedParticles3=USet)
         self._defineSourceRelation(self.tilpairparticles.get(), USet)
         
         TSet = self._createSetOfParticles("TiltedVol2")
-        Tpath = self._getExtraPath('Tilted_classification_vol2_iter_%d.xmd', self.iters.get())
+        Tpath = self._getExtraPath('Tilted_classification_vol2_iter_%d.xmd', int(self.iters.get()))
+        print Tpath
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
         self._defineOutputs(outputTiltedParticles4=TSet)
