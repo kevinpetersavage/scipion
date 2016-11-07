@@ -256,7 +256,7 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         md_TSet2.write(self._getExtraPath('tilted_assignment_vol2.xmd'))
         
         params =  '  -i %s' % self._getExtraPath('tilted_assignment_vol1.xmd')
-        params += '  -o %s' % self._getExtraPath('Reference_volume1_iter0.xmd')
+        params += '  -o %s' % self._getExtraPath('Reference_volume1_iter0.vol')
         params += '  --sym %s' % 'c1'
         params += '  --max_resolution %f' % 0.5
         params += '  --padding %f' %self.padFactor.get()
@@ -264,7 +264,7 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         
 
         params =  '  -i %s' % self._getExtraPath('tilted_assignment_vol2.xmd')
-        params += '  -o %s' % self._getExtraPath('Reference_volume2_iter0.xmd')
+        params += '  -o %s' % self._getExtraPath('Reference_volume2_iter0.vol')
         params += '  --sym %s' % 'c1'
         params += '  --max_resolution %f' % 0.5
         params += '  --padding %f' %self.padFactor.get()
@@ -279,15 +279,15 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         params += ' --md_Tilted2 %s' % self._getExtraPath('tilted_assignment_vol2_iter_%d.xmd', iterNum)
         params += ' --odirMdUntilted_Vol1 %s' % self._getExtraPath('Untilted_classification_vol1_iter_%d.xmd', iterNum)
         params += ' --odirMdTilted_Vol1 %s' % self._getExtraPath('Tilted_classification_vol1_iter_%d.xmd', iterNum)
-        params += ' --odirMdUntilted_Vol2 %s' % self._getExtraPath('Untilted_classification_vol2_iter_%d.xmd', iterNum)
-        params += ' --odirMdTilted_Vol2 %s' % self._getExtraPath('Tilted_classification_vol2_iter_%d.xmd', iterNum)
+        params += ' --odirMdUntilted_Vol2 %s' % self._getExtraPath('Untilted_classification_vol2_iter_%d.vol', iterNum)
+        params += ' --odirMdTilted_Vol2 %s' % self._getExtraPath('Tilted_classification_vol2_iter_%d.vol', iterNum)
         
         self.runJob('xmipp_classify_tilt_pairs', params, numberOfMpi=1)
         
     def reconstructFourierStep(self, volume2assign, iterNum):
 
         params =  '  -i %s' % self._getExtraPath('Tilted_classification_vol%d_iter_%d.xmd', volume2assign, iterNum)
-        params += '  -o %s' % self._getExtraPath('Reference_volume%d_iter%d.xmd', volume2assign, iterNum)
+        params += '  -o %s' % self._getExtraPath('Reference_volume%d_iter%d.vol', volume2assign, iterNum)
         params += '  --sym %s' % 'c1'
         params += '  --max_resolution %f' % 0.5
         params += '  --padding %f' %self.padFactor.get()
@@ -321,7 +321,7 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
             outputfnUntilted = self._getExtraPath(fnpath1)
             fnpath2 = 'tilted_assignment_vol%d_iter_%d.xmd' % (volume2assign, iterNum)
             outputfnTilted   = self._getExtraPath(fnpath2)
-            fnpath3 = 'Reference_volume%d_iter%d.xmd' %(volume2assign, iterNum-1)
+            fnpath3 = 'Reference_volume%d_iter%d.vol' %(volume2assign, iterNum-1)
             RefVolume = self._getExtraPath(fnpath3)
         
             
