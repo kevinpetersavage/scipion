@@ -137,8 +137,8 @@ class XmippProtMonoRes(ProtRefine3D):
         if self.halfVolumens.get() is False:
             params =  ' --vol %s' % self.inputVolume.get().getFileName()
         else:
-            params =  ' --vol1 %s' % self.inputVolume.get().getFileName()
-            params =  ' --vol2 %s' % self.inputVolume2.get().getFileName()
+            params =  ' --vol %s' % self.inputVolume.get().getFileName()
+            params +=  ' --vol2 %s' % self.inputVolume2.get().getFileName()
         params +=  ' --mask %s' % self.Mask.get().getFileName()
         params +=  ' -o %s' % self._getExtraPath('MGresolution.vol')
         params +=  ' --sampling_rate %f' % self.inputVolume.get().getSamplingRate()

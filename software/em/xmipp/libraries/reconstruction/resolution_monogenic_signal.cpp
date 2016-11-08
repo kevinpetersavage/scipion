@@ -30,7 +30,7 @@
 void ProgMonogenicSignalRes::readParams()
 {
 	fnVol = getParam("--vol");
-	fnVol1 = getParam("--vol1");
+	//fnVol1 = getParam("--vol1");
 	fnVol2 = getParam("--vol2");
 	fnOut = getParam("-o");
 	fnMask = getParam("--mask");
@@ -54,7 +54,7 @@ void ProgMonogenicSignalRes::defineParams()
 	addUsageLine("This function determines the local resolution of a map");
 	addParamsLine("  --vol <vol_file>   : Input volume");
 	addParamsLine("  --mask <vol_file>  : Mask defining the macromolecule");
-	addParamsLine("  [--vol1 <vol_file=\"\">]: Half volume 1");
+	//addParamsLine("  [--vol1 <vol_file=\"\">]: Half volume 1");
 	addParamsLine("                          :+ If two half volume are given, the noise is estimated from them");
 	addParamsLine("                          :+ Otherwise the noise is estimated outside the mask");
 	addParamsLine("  [--vol2 <vol_file=\"\">]: Half volume 2");
@@ -118,7 +118,7 @@ void ProgMonogenicSignalRes::produceSideInfo()
 			}
 		}
 	}
-	V.clear();
+
 
 	// Prepare low pass filter
 	lowPassFilter.FilterShape = RAISED_COSINE;
@@ -141,25 +141,29 @@ void ProgMonogenicSignalRes::produceSideInfo()
 		}
 	}
 
-	if ((fnVol1 !="") && (fnVol2 !=""))
+	if ((fnVol !="") && (fnVol2 !=""))
 	{
 		Image<double> V1, V2;
-		V1.read(fnVol1);
+		V1.read(fnVol);
 		V2.read(fnVol2);
 
 		V1()-=V2();
 		V1()/=sqrt(2);
-
 		fftN=new MultidimArray< std::complex<double> >;
-		transformer.FourierTransform(inputVol, *fftN);
+		std::cout << "antes del Fourier Transform" << std::endl;
+		FourierTransformer transformer2;
+		transformer2.FourierTransform(inputVol, *fftN);
 		halfMapsGiven = true;
+		std::cout << "dentro del 2 vols" << std::endl;
 	}
 	else
 	{
 		fftN=&fftV;
 		halfMapsGiven = false;
 	}
+	V.clear();
 }
+
 
 void ProgMonogenicSignalRes::amplitudeMonogenicSignal3D(MultidimArray< std::complex<double> > &myfftV,
 		double w1, MultidimArray<double> &amplitude, int count)
@@ -306,6 +310,8 @@ void ProgMonogenicSignalRes::run()
 {
 	produceSideInfo();
 
+	std::cout << "Starting" << std::endl;
+
 	Image<double> outputResolution;
 	outputResolution().initZeros(VRiesz);
 
@@ -334,6 +340,7 @@ void ProgMonogenicSignalRes::run()
 	int iter=0;
 	int count_res = 0;
 
+	std::cout << "Analyzing frequencies" << std::endl;
 	std::vector<double> noiseValues;
 	do
 	{

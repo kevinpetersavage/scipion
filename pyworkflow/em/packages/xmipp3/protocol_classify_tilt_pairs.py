@@ -273,21 +273,33 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
 
     def classifyStep(self, iterNum):
 
-        params =  ' --md_Untilted1 %s' % self._getExtraPath('untilted_assignment_vol1_iter_%d.xmd', iterNum)
-        params += ' --md_Tilted1 %s' % self._getExtraPath('tilted_assignment_vol1_iter_%d.xmd', iterNum)
-        params += ' --md_Untilted2 %s' % self._getExtraPath('untilted_assignment_vol_iter_%d.xmd', iterNum)
-        params += ' --md_Tilted2 %s' % self._getExtraPath('tilted_assignment_vol2_iter_%d.xmd', iterNum)
-        params += ' --odirMdUntilted_Vol1 %s' % self._getExtraPath('Untilted_classification_vol1_iter_%d.xmd', iterNum)
-        params += ' --odirMdTilted_Vol1 %s' % self._getExtraPath('Tilted_classification_vol1_iter_%d.xmd', iterNum)
-        params += ' --odirMdUntilted_Vol2 %s' % self._getExtraPath('Untilted_classification_vol2_iter_%d.vol', iterNum)
-        params += ' --odirMdTilted_Vol2 %s' % self._getExtraPath('Tilted_classification_vol2_iter_%d.vol', iterNum)
+        Untilted1Path = 'untilted_assignment_vol1_iter_%d.xmd' % iterNum
+        Tilted1Path = 'tilted_assignment_vol1_iter_%d.xmd' % iterNum
+        Untilted2Path = 'untilted_assignment_vol_iter_%d.xmd' % iterNum
+        Tilted2Path = 'tilted_assignment_vol2_iter_%d.xmd' % iterNum
+        untilted1_classPath = 'Untilted_classification_vol1_iter_%d.xmd' % iterNum
+        tilted1_classPath = 'Tilted_classification_vol1_iter_%d.xmd' % iterNum
+        untilted2_classPath = 'Untilted_classification_vol2_iter_%d.vol' % iterNum
+        tilted2_classPath = 'Tilted_classification_vol2_iter_%d.vol' % iterNum
+        
+        params =  ' --md_Untilted1 %s' % self._getExtraPath(Untilted1Path)
+        params += ' --md_Tilted1 %s' % self._getExtraPath(Tilted1Path)
+        params += ' --md_Untilted2 %s' % self._getExtraPath(Untilted2Path)
+        params += ' --md_Tilted2 %s' % self._getExtraPath(Tilted2Path)
+        params += ' --odirMdUntilted_Vol1 %s' % self._getExtraPath(untilted1_classPath)
+        params += ' --odirMdTilted_Vol1 %s' % self._getExtraPath(tilted1_classPath)
+        params += ' --odirMdUntilted_Vol2 %s' % self._getExtraPath(untilted2_classPath)
+        params += ' --odirMdTilted_Vol2 %s' % self._getExtraPath(tilted2_classPath)
         
         self.runJob('xmipp_classify_tilt_pairs', params, numberOfMpi=1)
         
     def reconstructFourierStep(self, volume2assign, iterNum):
+        
+        iPath = 'Tilted_classification_vol%d_iter_%d.xmd' % (volume2assign, iterNum)
+        oPath = 'Reference_volume%d_iter%d.vol' % (volume2assign, iterNum)
 
-        params =  '  -i %s' % self._getExtraPath('Tilted_classification_vol%d_iter_%d.xmd', volume2assign, iterNum)
-        params += '  -o %s' % self._getExtraPath('Reference_volume%d_iter%d.vol', volume2assign, iterNum)
+        params =  '  -i %s' % self._getExtraPath(iPath)
+        params += '  -o %s' % self._getExtraPath(oPath)
         params += '  --sym %s' % 'c1'
         params += '  --max_resolution %f' % 0.5
         params += '  --padding %f' %self.padFactor.get()
@@ -342,7 +354,8 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
 
     def createOutputStep(self):
         USet = self._createSetOfParticles("UntiltedVol1")
-        Upath = self._getExtraPath('Untilted_classification_vol1_iter_%d.xmd', int(self.iters.get()))
+        Upath_aux = 'Untilted_classification_vol1_iter_%d.xmd', int(self.iters.get())
+        Upath = self._getExtraPath(Upath_aux)
         print Upath
         readSetOfParticles(Upath, USet)
         USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
@@ -350,7 +363,8 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         self._defineSourceRelation(self.tilpairparticles.get(), USet)
          
         TSet = self._createSetOfParticles("TiltedVol1")
-        Tpath = self._getExtraPath('Tilted_classification_vol1_iter_%d.xmd', int(self.iters.get()))
+        Tpath_aux = 'Tilted_classification_vol1_iter_%d.xmd', int(self.iters.get())
+        Tpath = self._getExtraPath(Tpath_aux)
         print Tpath
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
@@ -370,7 +384,8 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         
 
         USet = self._createSetOfParticles("UntiltedVol2")
-        Upath = self._getExtraPath('Untilted_classification_vol2_iter_%d.xmd', int(self.iters.get()))
+        Upath_aux = 'Untilted_classification_vol2_iter_%d.xmd', int(self.iters.get())
+        Upath = self._getExtraPath(Upath_aux)
         print Upath
         readSetOfParticles(Upath, USet)
         USet.setSamplingRate((self.tilpairparticles.get().getUntilted().getSamplingRate()))
@@ -378,7 +393,8 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         self._defineSourceRelation(self.tilpairparticles.get(), USet)
         
         TSet = self._createSetOfParticles("TiltedVol2")
-        Tpath = self._getExtraPath('Tilted_classification_vol2_iter_%d.xmd', int(self.iters.get()))
+        Tpath_aux = 'Tilted_classification_vol2_iter_%d.xmd', int(self.iters.get())
+        Tpath = self._getExtraPath(Tpath_aux)
         print Tpath
         readSetOfParticles(Tpath, TSet)
         TSet.setSamplingRate((self.tilpairparticles.get().getTilted().getSamplingRate()))
