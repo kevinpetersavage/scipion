@@ -337,8 +337,8 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
             RefVolume = self._getExtraPath(fnpath3)
         
             
-        params =  ' --untiltparticles %s' % self.imgsFnUntilted
-        params += ' --tiltparticles %s' % self.imgsFnTilted
+        params =  ' --untiltparticles %s' % self._getExtraPath() + '/all_untilted_particles_input.xmd'
+        params += ' --tiltparticles %s' % self._getExtraPath() + '/all_tilted_particles_input.xmd'
         params += ' --odir %s' % self._getExtraPath()
         params += ' --untiltassignment %s' % outputfnUntilted
         params += ' --tiltassignment %s' % outputfnTilted
