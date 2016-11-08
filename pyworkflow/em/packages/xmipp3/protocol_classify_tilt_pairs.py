@@ -275,7 +275,7 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
 
         Untilted1Path = 'untilted_assignment_vol1_iter_%d.xmd' % iterNum
         Tilted1Path = 'tilted_assignment_vol1_iter_%d.xmd' % iterNum
-        Untilted2Path = 'untilted_assignment_vol_iter_%d.xmd' % iterNum
+        Untilted2Path = 'untilted_assignment_vol2_iter_%d.xmd' % iterNum
         Tilted2Path = 'tilted_assignment_vol2_iter_%d.xmd' % iterNum
         untilted1_classPath = 'Untilted_classification_vol1_iter_%d.xmd' % iterNum
         tilted1_classPath = 'Tilted_classification_vol1_iter_%d.xmd' % iterNum
