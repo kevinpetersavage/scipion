@@ -45,15 +45,14 @@ void ProgMonogenicSignalRes::readParams()
 	exactres = checkParam("--exact");
 	fnSpatial = getParam("--filtered_volume");
 	significance = getDoubleParam("--significance");
-
-
 }
+
 
 void ProgMonogenicSignalRes::defineParams()
 {
 	addUsageLine("This function determines the local resolution of a map");
 	addParamsLine("  --vol <vol_file>   : Input volume");
-	addParamsLine("  --mask <vol_file>  : Mask defining the macromolecule");
+	addParamsLine("  [--mask <vol_file=\"\">]  : Mask defining the macromolecule");
 	//addParamsLine("  [--vol1 <vol_file=\"\">]: Half volume 1");
 	addParamsLine("                          :+ If two half volume are given, the noise is estimated from them");
 	addParamsLine("                          :+ Otherwise the noise is estimated outside the mask");
@@ -72,13 +71,14 @@ void ProgMonogenicSignalRes::defineParams()
 	addParamsLine("  [--exact]                 : The search for resolution will be exact (slower) of approximated (fast).");
 	addParamsLine("                            : Usually there are no difference between both in the resolution map.");
 	addParamsLine("  [--filtered_volume <vol_file=\"\">]       : The input volume is locally filtered at local resolutions.");
-	addParamsLine("  [--significance <s=0.95>]  : The level of conficendence for the hypothesis test.");
+	addParamsLine("  [--significance <s=0.95>]  : The level of confidence for the hypothesis test.");
 
 
 }
 
 void ProgMonogenicSignalRes::produceSideInfo()
 {
+	std::cout << "Starting..." << std::endl;
     Image<double> V; // Input volume
 	V.read(fnVol);
 	V().setXmippOrigin();
@@ -127,19 +127,50 @@ void ProgMonogenicSignalRes::produceSideInfo()
 	lowPassFilter.FilterBand = LOWPASS;
 
 	// Prepare mask
-	mask.read(fnMask);
-	mask().setXmippOrigin();
-	MultidimArray<int> &pMask=mask();
-	if (R>0)
+
+	Image<int> pMask_int;
+	regionGrowing3DEqualValue(V(), pMask_int(), -1);
+	std::cout << "CK1" << std::endl;
+
+	if (fnMask != "")
 	{
-		double R2=R*R;
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask)
-		{
-			double r2=k*k+i*i+j*j;
-			if (r2>=R2)
-				A3D_ELEM(pMask,k,i,j)=-1;
-		}
+		mask.read(fnMask);
+		mask().setXmippOrigin();
 	}
+	MultidimArray<int> &pMask=mask();
+
+	////////////////////////
+	if ((fnVol !="") && (fnVol2 !=""))
+	{
+		if (fnMask != "")
+		{
+			FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask_int())
+			{
+				if (A3D_ELEM(pMask_int(),k,i,j)==-1)
+					A3D_ELEM(pMask,k,i,j)=A3D_ELEM(pMask_int(),k,i,j);
+			}
+		}
+		else
+			mask = pMask_int;
+	}
+	else{
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask_int())
+		{
+			if (A3D_ELEM(pMask_int(),k,i,j)==-1)
+				A3D_ELEM(pMask,k,i,j)=A3D_ELEM(pMask_int(),k,i,j);
+		}
+//		if (R>0)
+//			{
+//				double R2=R*R;
+//				FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask)
+//				{
+//					double r2=k*k+i*i+j*j;
+//					if (r2>=R2)
+//						A3D_ELEM(pMask,k,i,j)=-1;
+//				}
+//			}
+	}
+	 ///////////////////////
 
 	if ((fnVol !="") && (fnVol2 !=""))
 	{
@@ -150,11 +181,9 @@ void ProgMonogenicSignalRes::produceSideInfo()
 		V1()-=V2();
 		V1()/=sqrt(2);
 		fftN=new MultidimArray< std::complex<double> >;
-		std::cout << "antes del Fourier Transform" << std::endl;
 		FourierTransformer transformer2;
 		transformer2.FourierTransform(inputVol, *fftN);
 		halfMapsGiven = true;
-		std::cout << "dentro del 2 vols" << std::endl;
 	}
 	else
 	{
@@ -162,6 +191,7 @@ void ProgMonogenicSignalRes::produceSideInfo()
 		halfMapsGiven = false;
 	}
 	V.clear();
+	pMask_int.clear();
 }
 
 
@@ -309,8 +339,6 @@ void ProgMonogenicSignalRes::amplitudeMonogenicSignal3D(MultidimArray< std::comp
 void ProgMonogenicSignalRes::run()
 {
 	produceSideInfo();
-
-	std::cout << "Starting" << std::endl;
 
 	Image<double> outputResolution;
 	outputResolution().initZeros(VRiesz);

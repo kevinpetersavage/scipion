@@ -48,26 +48,29 @@ class XmippProtMonoRes(ProtRefine3D):
     def _defineParams(self, form):
         form.addSection(label='Input')
   
-        form.addParam('halfVolumens', BooleanParam, default=False, label="Would you like to use half volumens?", 
-                      help='The noise estimation for determining the local resolution is performed via half volumnes.')
+        form.addParam('halfVolumens', BooleanParam, default=False, 
+                      label="Would you like to use half volumens?", 
+                      help='The noise estimation for determining the local resolution ' 
+                           'is performed via half volumnes.')
        
         form.addParam('inputVolume', PointerParam, pointerClass='Volume', 
                       label="Input Volume", 
                       help='Select a volume for determining its local resolucion.')
         
         form.addParam('inputVolume2', PointerParam, pointerClass='Volume', 
-                      label="Second Half Volumen",  condition = 'halfVolumens', 
+                      label="Second Half Volume",  condition = 'halfVolumens', 
                       help='Select a second volume for determining a local resolucion.')
         
-        form.addParam('Mask', PointerParam, label="Mask", pointerClass='VolumeMask', allowsNull=True,
-                      help='The mask determines the those points of the sphere where the macromolecle is')
+        form.addParam('Mask', PointerParam, pointerClass='VolumeMask', allowsNull=True, 
+                      label="Mask", 
+                      help='The mask determines the those points where the macromolecle is')
 
-        form.addParam('premask', BooleanParam, default=False,
-                      label="Is the volume in a circular mask?",
-                      help='Sometimes the volume is in an sphere, then this option ought to be selected')
-        form.addParam('circularRadius', FloatParam, label="Radius Circular Mask",  condition = 'premask', 
-                      default=50, 
-                      help='This is the radius of the circular mask.')
+#         form.addParam('premask', BooleanParam, default=False,
+#                       label="Is the volume in a circular mask?",
+#                       help='Sometimes the volume is in an sphere, then this option ought to be selected')
+#         form.addParam('circularRadius', FloatParam, label="Radius Circular Mask",  condition = 'premask', 
+#                       default=50, 
+#                       help='This is the radius of the circular mask.')
 
         line = form.addLine('Resolution Range (A)', 
                       help="If the user knows the range of resolutions or only a"
@@ -139,10 +142,13 @@ class XmippProtMonoRes(ProtRefine3D):
         else:
             params =  ' --vol %s' % self.inputVolume.get().getFileName()
             params +=  ' --vol2 %s' % self.inputVolume2.get().getFileName()
-        params +=  ' --mask %s' % self.Mask.get().getFileName()
+        if self.halfVolumens.get() is False:
+            params +=  ' --mask %s' % self.Mask.get().getFileName()
+        else:
+            if self.provideMaskInHalves.get() is True:
+                params +=  ' --mask %s' % self.Mask2Halves.get().getFileName()
         params +=  ' -o %s' % self._getExtraPath('MGresolution.vol')
         params +=  ' --sampling_rate %f' % self.inputVolume.get().getSamplingRate()
-        
         params +=  ' --number_frequencies %f' % 50
         params +=  ' --minRes %f' % self.minRes.get()
         params +=  ' --maxRes %f' % self.maxRes.get()
@@ -156,8 +162,8 @@ class XmippProtMonoRes(ProtRefine3D):
         else:
             params +=  ' --filtered_volume %s' %''
 
-        if self.premask.get() is True:
-            params +=  ' --circular_mask %f' % self.circularRadius.get()
+#         if self.premask.get() is True:
+#             params +=  ' --circular_mask %f' % self.circularRadius.get()
         if self.trimming.get() is True:
             params +=  ' --trimmed %f' % self.kValue.get()
         else:
