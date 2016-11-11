@@ -116,8 +116,10 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         
         if self.inputVolume.get() is True:
             if self.TwoVolumes.get() is False:
-                stepId  = self._insertFunctionStep('angularTiltAssignmentStep', 1, 0, prerequisites=[convertId])
-                stepId3 = self._insertFunctionStep('InitialVolumesStep', prerequisites=[stepId])
+                stepIdTV  = self._insertFunctionStep('angularTiltAssignmentStep', 1, 0, prerequisites=[convertId])
+                stepIdTV2 = self._insertFunctionStep('InitialVolumesStep', prerequisites=[stepIdTV])
+                stepIdTV3 = self._insertFunctionStep('medianFilterStep', 1, 0, prerequisites=[stepIdTV2])
+                stepIdTV4 = self._insertFunctionStep('medianFilterStep', 2, 0, prerequisites=[stepIdTV3])
 #             else:
 #                 stepId  = self._insertFunctionStep('angularTiltAssignmentStep', 1,prerequisites=[convertId])
 #                 stepId2 = self._insertFunctionStep('angularTiltAssignmentStep', 2,prerequisites=[stepId])
