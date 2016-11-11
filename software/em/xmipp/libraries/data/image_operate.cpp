@@ -269,6 +269,76 @@ void radialAvg(Image<double> &op)
     }
 }
 
+void medianFilterVolumes(Image<double> &input_vol)
+{
+Image<double> output_vol;
+output_vol().initZeros(input_vol());
+MultidimArray<double> p2input_vol;
+p2input_vol = input_vol();
+
+double values[6];
+
+for (size_t k= 1; k<ZSIZE(p2input_vol)-1; k++)
+{
+  for (size_t i= 1; i<YSIZE(p2input_vol)-1; i++)
+  {
+    for (size_t j= 1; j<XSIZE(p2input_vol)-1; j++)
+    {
+      values[0] = A3D_ELEM(p2input_vol, k-1, i, j);
+      values[1] = A3D_ELEM(p2input_vol, k+1, i, j);
+      values[2] = A3D_ELEM(p2input_vol, k, i-1, j);
+      values[3] = A3D_ELEM(p2input_vol, k, i+1, j);
+      values[4] = A3D_ELEM(p2input_vol, k, i, j-1);
+      values[5] = A3D_ELEM(p2input_vol, k, i, j+1);
+
+      std::sort(values, values+6);
+
+      A3D_ELEM(output_vol(), k, i, j) = 0.5* (values[2] + values[3]);
+    }
+  }
+}
+input_vol = output_vol;
+}
+
+
+void medianFilterImages(Image<double> &input_img)
+{
+Image<double> output_img;
+output_img().initZeros(input_img());
+MultidimArray<double> p2input_img;
+p2input_img = input_img();
+
+double values[8];
+
+for (size_t i= 1; i<YSIZE(p2input_img)-1; i++)
+{
+	for (size_t j= 1; j<XSIZE(p2input_img)-1; j++)
+	{
+		values[0] = A2D_ELEM(p2input_img, i+1, j);
+		values[1] = A2D_ELEM(p2input_img, i+1, j+1);
+		values[2] = A2D_ELEM(p2input_img, i+1, j-1);
+		values[3] = A2D_ELEM(p2input_img, i, j+1);
+		values[4] = A2D_ELEM(p2input_img, i, j-1);
+		values[5] = A2D_ELEM(p2input_img, i-1, j+1);
+		values[6] = A2D_ELEM(p2input_img, i-1, j-1);
+		values[7] = A2D_ELEM(p2input_img, i-1, j);
+
+		std::sort(values, values+8);
+
+		A2D_ELEM(output_img(), i, j) = 0.5* (values[3] + values[4]);
+	}
+}
+input_img = output_img;
+}
+
+void medianFilter(Image<double> &img)
+{
+	if (ZSIZE(img())>1)
+		medianFilterVolumes(img);
+	else
+		medianFilterImages(img);
+}
+
 void reset(Image<double> &op)
 {
 	op().initZeros();
@@ -311,6 +381,7 @@ void ProgOperate::defineParams()
     addParamsLine("or --row    <value>          :Extracts a given row from a image or volume");
     addParamsLine("or --radial_avg              :Compute the radial average of an image");
     addParamsLine("or --reset                   :Set the image to 0");
+    addParamsLine("or --median                  :Computes the median image or volume");
 
     addExampleLine("Sum two volumes and save result", false);
     addExampleLine("xmipp_image_operate -i volume1.vol --plus volume2.vol -o result.vol");
@@ -461,6 +532,8 @@ void ProgOperate::readParams()
         unaryOperator = log;
     else if (checkParam("--log10"))
         unaryOperator = log10;
+    else if (checkParam("--median"))
+   		unaryOperator = medianFilter;
     else
         REPORT_ERROR(ERR_VALUE_INCORRECT, "No valid operation specified");
     int dotProduct = false;

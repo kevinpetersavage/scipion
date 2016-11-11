@@ -129,9 +129,11 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
             stepId3 = self._insertFunctionStep('classifyStep', iterNum+1, prerequisites=[stepId2])
             stepId4 = self._insertFunctionStep('reconstructFourierStep', 1, iterNum+1, prerequisites=[stepId3])
             stepId5 = self._insertFunctionStep('reconstructFourierStep', 2, iterNum+1, prerequisites=[stepId4])
+            stepId6 = self._insertFunctionStep('medianFilterStep', 1, iterNum+1, prerequisites=[stepId5])
+            stepId7 = self._insertFunctionStep('medianFilterStep', 2, iterNum+1, prerequisites=[stepId6])
             
 
-        self._insertFunctionStep('createOutputStep', prerequisites=[stepId5])
+        self._insertFunctionStep('createOutputStep', prerequisites=[stepId7])
 
 
     def convertInputStep(self):
@@ -304,6 +306,17 @@ class XmippProtClassifyTiltPairs(XmippProtParticlePickingPairs):
         params += '  --max_resolution %f' % 0.5
         params += '  --padding %f' %self.padFactor.get()
         self.runJob('xmipp_reconstruct_fourier', params);
+        
+    def medianFilterStep(self, volume2assign, iterNum):
+        
+        iPath = 'Tilted_classification_vol%d_iter_%d.xmd' % (volume2assign, iterNum)
+        oPath = 'Reference_volume%d_iter%d.vol' % (volume2assign, iterNum)
+
+        params =  '  -i %s' % self._getExtraPath(oPath)
+        params += '  -o %s' % self._getExtraPath(oPath)
+        params += '  --median'
+
+        self.runJob('xmipp_image_operate', params);
         
     
     def angularTiltAssignmentStep(self, volume2assign, iterNum):
