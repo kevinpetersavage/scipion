@@ -25,7 +25,7 @@
  ***************************************************************************/
 
 #include "resolution_monogenic_signal.h"
-//#define DEBUG
+#define DEBUG
 
 void ProgMonogenicSignalRes::readParams()
 {
@@ -79,8 +79,23 @@ void ProgMonogenicSignalRes::defineParams()
 void ProgMonogenicSignalRes::produceSideInfo()
 {
 	std::cout << "Starting..." << std::endl;
-    Image<double> V; // Input volume
-	V.read(fnVol);
+	Image<double> V;
+	if ((fnVol !="") && (fnVol2 !=""))
+	{
+		Image<double> V1, V2;
+		V1.read(fnVol);
+		V2.read(fnVol2);
+		V()=0.5*(V1()+V2());
+		halfMapsGiven = true;
+		V.write("AverageVolume.vol");
+	}
+	else{
+	    V.read(fnVol);
+	    halfMapsGiven = false;
+	}
+	
+	
+
 	V().setXmippOrigin();
 
 	FourierTransformer transformer;
@@ -127,10 +142,12 @@ void ProgMonogenicSignalRes::produceSideInfo()
 	lowPassFilter.FilterBand = LOWPASS;
 
 	// Prepare mask
-
 	Image<int> pMask_int;
 	regionGrowing3DEqualValue(V(), pMask_int(), -1);
-	std::cout << "CK1" << std::endl;
+	
+	#ifdef DEBUG
+	  pMask_int.write("pMask_int.vol");
+	#endif
 
 	if (fnMask != "")
 	{
@@ -140,7 +157,8 @@ void ProgMonogenicSignalRes::produceSideInfo()
 	MultidimArray<int> &pMask=mask();
 
 	////////////////////////
-	if ((fnVol !="") && (fnVol2 !=""))
+	//if ((fnVol !="") && (fnVol2 !=""))inputVol
+	if (halfMapsGiven)
 	{
 		if (fnMask != "")
 		{
@@ -159,20 +177,15 @@ void ProgMonogenicSignalRes::produceSideInfo()
 			if (A3D_ELEM(pMask_int(),k,i,j)==-1)
 				A3D_ELEM(pMask,k,i,j)=A3D_ELEM(pMask_int(),k,i,j);
 		}
-//		if (R>0)
-//			{
-//				double R2=R*R;
-//				FOR_ALL_ELEMENTS_IN_ARRAY3D(pMask)
-//				{
-//					double r2=k*k+i*i+j*j;
-//					if (r2>=R2)
-//						A3D_ELEM(pMask,k,i,j)=-1;
-//				}
-//			}
 	}
+	
+	#ifdef DEBUG
+	mask.write("mascara.vol");
+	#endif
 	 ///////////////////////
 
-	if ((fnVol !="") && (fnVol2 !=""))
+	//if ((fnVol !="") && (fnVol2 !=""))
+	if (halfMapsGiven)
 	{
 		Image<double> V1, V2;
 		V1.read(fnVol);
@@ -182,13 +195,14 @@ void ProgMonogenicSignalRes::produceSideInfo()
 		V1()/=sqrt(2);
 		fftN=new MultidimArray< std::complex<double> >;
 		FourierTransformer transformer2;
+		MultidimArray<double> &inputVol = V1();
 		transformer2.FourierTransform(inputVol, *fftN);
-		halfMapsGiven = true;
+		//halfMapsGiven = true;
 	}
 	else
 	{
 		fftN=&fftV;
-		halfMapsGiven = false;
+		//halfMapsGiven = false;
 	}
 	V.clear();
 	pMask_int.clear();
@@ -313,6 +327,15 @@ void ProgMonogenicSignalRes::amplitudeMonogenicSignal3D(MultidimArray< std::comp
 	fnSaveImg = formatString("amplitudeMS_%i.vol", count);
 	saveImg.write(fnSaveImg);
 	saveImg.clear();
+	if (halfMapsGiven)
+	{
+	    Image<double> saveImg;
+	    saveImg = amplitude;
+	    	FileName fnSaveImg;
+		fnSaveImg = formatString("amplitudeMS_%i_HMs.vol", count);
+		saveImg.write(fnSaveImg);
+		saveImg.clear();
+	}
 	}
 
 	// Low pass filter the monogenic amplitude
@@ -499,7 +522,6 @@ void ProgMonogenicSignalRes::run()
 		double meanN=sumN/NN;
 		double sigma2N=sumN2/NN-meanN*meanN;
 
-
 		if (meanS>max_meanS)
 			max_meanS = meanS;
 
@@ -520,7 +542,9 @@ void ProgMonogenicSignalRes::run()
 			thresholdNoise = meanN+criticalZ*sqrt(sigma2N);
 
 
-
+		#ifdef DEBUG
+		  std::cout << "Iteration = " << iter << ",   Resolution= " << resolution << ",   Signal = " << meanS << ",   Noise = " << meanN << ",  Threshold = " << thresholdNoise <<std::endl;
+		#endif
 
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(amplitudeMS)

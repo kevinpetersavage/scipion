@@ -61,20 +61,20 @@ class XmippProtMonoRes(ProtRefine3D):
                       label="Second Half Volume",  condition = 'halfVolumens', 
                       help='Select a second volume for determining a local resolucion.')
         
+        form.addParam('provideMaskInHalves', BooleanParam, default=False,
+		      condition = 'halfVolumens',
+                      label="Use mask with halves volumes?",
+                      help='Sometimes the volume is in an sphere, then this option ought to be selected')
+        
         form.addParam('Mask', PointerParam, pointerClass='VolumeMask', allowsNull=True, 
+		      condition = '(provideMaskInHalves and halfVolumens) or (not halfVolumens)',
                       label="Mask", 
                       help='The mask determines the those points where the macromolecle is')
-
-#         form.addParam('premask', BooleanParam, default=False,
-#                       label="Is the volume in a circular mask?",
-#                       help='Sometimes the volume is in an sphere, then this option ought to be selected')
-#         form.addParam('circularRadius', FloatParam, label="Radius Circular Mask",  condition = 'premask', 
-#                       default=50, 
-#                       help='This is the radius of the circular mask.')
 
         line = form.addLine('Resolution Range (A)', 
                       help="If the user knows the range of resolutions or only a"
                       " range of frequency needs to be analysed", expertLevel=LEVEL_ADVANCED)
+	
         line.addParam('minRes', FloatParam, default=1, label='Min')
         line.addParam('maxRes', FloatParam, default=100, label='Max')
         
@@ -139,14 +139,12 @@ class XmippProtMonoRes(ProtRefine3D):
 
         if self.halfVolumens.get() is False:
             params =  ' --vol %s' % self.inputVolume.get().getFileName()
+            params +=  ' --mask %s' % self.Mask.get().getFileName()
         else:
             params =  ' --vol %s' % self.inputVolume.get().getFileName()
             params +=  ' --vol2 %s' % self.inputVolume2.get().getFileName()
-        if self.halfVolumens.get() is False:
-            params +=  ' --mask %s' % self.Mask.get().getFileName()
-        else:
-            if self.provideMaskInHalves.get() is True:
-                params +=  ' --mask %s' % self.Mask2Halves.get().getFileName()
+	    if self.provideMaskInHalves.get() is True:
+		params +=  ' --mask %s' % self.Mask.get().getFileName()
         params +=  ' -o %s' % self._getExtraPath('MGresolution.vol')
         params +=  ' --sampling_rate %f' % self.inputVolume.get().getSamplingRate()
         params +=  ' --number_frequencies %f' % 50
@@ -224,8 +222,6 @@ class XmippProtMonoRes(ProtRefine3D):
         validateMsgs = []
         if not self.inputVolume.get().hasValue():
             validateMsgs.append('Please provide input volume.')  
-        if not self.Mask.get().hasValue():
-            validateMsgs.append('Please provide input mask.')         
         return validateMsgs
 
 
