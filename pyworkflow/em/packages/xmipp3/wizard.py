@@ -45,6 +45,7 @@ from pyworkflow.em.protocol.protocol_import.coordinates import ProtImportCoordin
 from protocol_particle_pick_consensus import XmippProtConsensusPicking
 from protocol_rotational_spectra import XmippProtRotSpectra
 from protocol_reconstruct_highres import XmippProtReconstructHighRes
+from protocol_classify3D_ransac import XmippProtClass3DRansac
 
 from pyworkflow.em.wizard import *
 
@@ -181,7 +182,8 @@ class XmippCL2DNumberOfClassesWizard(Wizard):
 class XmippParticleMaskRadiusWizard(ParticleMaskRadiusWizard):
     _targets = [(XmippProtMaskParticles, ['radius']),
                 (XmippProtPreprocessParticles, ['backRadius']),
-                (XmippProtReconstructHighRes, ['particleRadius'])]
+                (XmippProtReconstructHighRes, ['particleRadius']),
+                (XmippProtClass3DRansac, ['backRadius'])]
     
     def _getParameters(self, protocol):
         
