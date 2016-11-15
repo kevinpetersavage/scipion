@@ -68,6 +68,9 @@ class XmippProtClass3DRansac(ProtClassify3D, XmippProtDirectionalClasses, XmippP
                       pointerClass='SetOfParticles', pointerCondition='hasAlignment',
                       label="Input particles", important=True,
                       help='Select the input projection images.')
+        form.addParam('backRadius', IntParam, default=-1,
+                      label='Mask radius',
+                      help='Pixels outside this circle are assumed to be noise')
         form.addParam('targetResolution', FloatParam, default=10, label='Target resolution (A)', expertLevel=LEVEL_ADVANCED,
                       help='Expected Resolution of the initial 3D classes obtained by the 2D classes. You should have a good' 
                       'reason to modify the 10 A value')
@@ -139,7 +142,6 @@ class XmippProtClass3DRansac(ProtClassify3D, XmippProtDirectionalClasses, XmippP
         writeSetOfParticles(self.inputParticles.get(), self._getPath('input_particles.xmd'))
         
         if (self.doWiener == True):
-        
             params  =  '  -i %s' % self._getPath('input_particles.xmd')
             params +=  '  -o %s' % self._getExtraPath('corrected_ctf_particles.stk')
             params +=  '  --save_metadata_stack %s' % self._getExtraPath('corrected_ctf_particles.xmd')
@@ -169,13 +171,11 @@ class XmippProtClass3DRansac(ProtClassify3D, XmippProtDirectionalClasses, XmippP
             params =  '  -i %s' % self._getExtraPath('corrected_ctf_particles.xmd')
         else :
             params =  '  -i %s' % self._getPath('input_particles.xmd')
-            
         params +=  '  -o %s' % self._getExtraPath('scaled_particles.stk')
         params +=  '  --save_metadata_stack %s' % self._getExtraPath('scaled_particles.xmd')
         params +=  '  --dim %d' % newXdim
         
         self.runJob('xmipp_image_resize',params)
-    
         from pyworkflow.em.convert import ImageHandler
         img = ImageHandler()
         img.convert(self.inputVolume.get(), self._getExtraPath("volume.vol"))
@@ -193,6 +193,13 @@ class XmippProtClass3DRansac(ProtClassify3D, XmippProtDirectionalClasses, XmippP
         fnGallery=self._getExtraPath("gallery.doc")
         listOfBlocks = xmipp.getBlocksInMetaDataFile(fnNeighbours)
         
+        Xdim = self.inputParticles.get().getDimensions()[0]
+        Ts = self.inputParticles.get().getSamplingRate()
+        newTs = self.targetResolution.get()*0.4
+        newTs = max(Ts,newTs)
+        self.newRadius=(self.backRadius.get())*(Ts/newTs)
+        normFreq = 0.25*(self.targetResolution.get()/Ts)
+
         md = xmipp.MetaData()
         for i in range(self.directionalSamples):
             randBlock =random.randint(0, len(listOfBlocks))
@@ -210,6 +217,10 @@ class XmippProtClass3DRansac(ProtClassify3D, XmippProtDirectionalClasses, XmippP
             self.runJob("xmipp_image_align","-i %s  --oroot %s --iter 5 --ref %s"
                         %(fnBlock,fnDir,mdRef.getValue(xmipp.MDL_IMAGE,galleryImgNo)),numberOfMpi=1)
             
+            self.runJob("xmipp_transform_mask","-i %s  -o %s --mask circular -%f"
+                        %(self._getExtraPath("direction_%s_ref.xmp"%i),self._getExtraPath("direction_%s_ref.xmp"%i),self.newRadius)
+                          ,numberOfMpi=1)
+            
             objId = md.addObject()
             md.setValue(xmipp.MDL_IMAGE,self._getExtraPath("direction_%s_ref.xmp"%i),objId)
             md.setValue(xmipp.MDL_ANGLE_ROT,rot,objId)
@@ -220,8 +231,12 @@ class XmippProtClass3DRansac(ProtClassify3D, XmippProtDirectionalClasses, XmippP
 
         fnRecons = self._getExtraPath("guess_%s"%0)
         md.write(fnRecons+'.xmd')
-        self.runJob("xmipp_reconstruct_fourier","-i %s.xmd -o %s.vol --sym %s " %(fnRecons,fnRecons,self.symmetryGroup.get()))
-
+        
+        self.runJob("xmipp_reconstruct_fourier","-i %s.xmd -o %s.vol --sym %s --max_resolution %f" %(fnRecons,fnRecons,self.symmetryGroup.get(),normFreq))
+        self.runJob("xmipp_transform_filter",   "-i %s.vol -o %s.vol --fourier low_pass %f --bad_pixels outliers 0.5" %(fnRecons,fnRecons,normFreq))
+        self.runJob("xmipp_transform_mask","-i %s.vol  -o %s.vol --mask circular -%f" %(fnRecons,fnRecons,self.newRadius))
+        md.clear()
+        
         #objId = mdCorr.addObject()
         #mdCorr.setValue(xmipp.MDL_WEIGHT,self.corrThresh.get(),objId)
         #mdCorr.write("corrThreshold@"+fnCorr,xmipp.MD_APPEND)
