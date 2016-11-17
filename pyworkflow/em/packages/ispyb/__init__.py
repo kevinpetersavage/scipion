@@ -1,7 +1,10 @@
 # **************************************************************************
 # *
-# * Authors:
+# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es) [1]
+# *              Kevin Savage (kevin.savage@diamond.ac.uk) [2]
 # *
+# * [1] Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * [2] Diamond Light Source, Ltd
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -26,5 +29,6 @@
 from bibtex import _bibtex # Load bibtex dict with references
 
 _logo = None
+_references = ['Delageniere2011']
 
 from protocol_monitor_ispyb import ProtMonitorISPyB

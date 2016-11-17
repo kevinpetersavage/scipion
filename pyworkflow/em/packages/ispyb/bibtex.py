@@ -1,9 +1,11 @@
 # coding: latin-1
 # **************************************************************************
 # *
-# * Authors:     Josue Gomez Blanco (jgomez@cnb.csic.es)
+# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es) [1]
+# *              Kevin Savage (kevin.savage@diamond.ac.uk) [2]
 # *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * [1] Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * [2] Diamond Light Source, Ltd
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -27,19 +29,41 @@
 
 _bibtexStr = """
 
-@Article{Serban2015,
-  Title                    = {Localized reconstruction of subunits from electron cryomicroscopy images.},
-  Author                   = {Ilca, Serban L. and Kotecha, A. Sun, Xiaoyu and Poranen, Minna M. and Stuart, David I. and Huiskonen, Juha T.},
-  Journal                  = {Nat Commun},
-  Year                     = {2015},
-  Month                    = {November},
-  Volume                   = {6},
-  Doi                      = {http://dx.doi.org/10.1038/ncomms9843},
-  Url                      = {http://www.nature.com/ncomms/2015/151104/ncomms9843/full/ncomms9843.html}
+@article{Delageniere2011,
+  author    = {Delageniere, Solange and
+               Brenchereau, Patrice  and
+               Launer, Ludovic  and
+               Ashton, Alun W.  and
+               Leal, Ricardo  and
+               Veyrier, Stephanie  and
+               Gabadinho, Jose  and
+               Gordon, Elspeth J.  and
+               Jones, Samuel D.  and
+               Levik, Karl Erik  and
+               McSweeney, Sean M.  and
+               Monaco, Stephanie  and
+               Nanao, Max  and
+               Spruce, Darren  and
+               Svensson, Olof  and
+               Walsh, Martin A.  and
+               Leonard, Gordon A.},
+  title     = {ISPyB: an information management system for synchrotron macromolecular
+               crystallography},
+  journal   = {Bioinformatics},
+  volume    = {27},
+  number    = {22},
+  pages     = {3186--3192},
+  year      = {2011},
+  url       = {http://dx.doi.org/10.1093/bioinformatics/btr535},
+  doi       = {http://dx.doi.org/10.1093/bioinformatics/btr535},
+  timestamp = {Mon, 14 Nov 2011 15:11:21 +0100}
 }
-
 """
 
 from pyworkflow.utils import parseBibTex
 
 _bibtex = parseBibTex(_bibtexStr)  
+
+'''
+
+'''
