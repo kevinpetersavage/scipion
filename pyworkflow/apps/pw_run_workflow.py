@@ -30,25 +30,64 @@ This module is responsible for running workflows from a json description.
 
 from pyworkflow.manager import Manager
 import sys
+import time
 
-def run(project_name, workflow):
+
+def run(name, workflow, launch_timeout):
     manager = Manager()
-    project = manager.createProject(project_name)
+    project = manager.createProject(name)
     protocols = project.loadProtocols(workflow)
-    for id, protocol in protocols.iteritems():
-        project.launchProtocol(protocol, wait=True)
 
-        if protocol.isFailed():
-            print "\n>>> ERROR running protocol %s" % protocol.getRunName()
-            print "    FAILED with error: %s\n" % protocol.getErrorMessage()
-            raise Exception("ERROR launching protocol.")
+    graph = project.getGraphFromRuns(protocols.values())
+    nodes = graph.getRoot().iterChildsBreadth()
 
-        if not protocol.isFinished():
-            print "\n>>> ERROR running protocol %s" % protocol.getRunName()
-            raise Exception("ERROR: Protocol not finished")
+    protocols_by_id = {protocol.strId():protocol for protocol in protocols.values()}
+
+    for node in nodes:
+        protocol = protocols_by_id[node.getName()]
+        parents = collect_parents(node, protocols_by_id)
+
+        launch_when_ready(parents, project, protocol, launch_timeout)
+
+
+def collect_parents(node, protocols_by_id):
+    return {protocols_by_id[parent_node.getName()]
+            for parent_node in node.getParents() if not parent_node.isRoot()}
+
+
+def launch_when_ready(parents, project, protocol, launch_timeout):
+    start = time.time()
+    while time.time() < start + launch_timeout:
+        update_protocols(parents, project)
+
+        errors = protocol.validate()
+        if errors:
+            print errors
+            time.sleep(1)
+        else:
+            project.launchProtocol(protocol)
+            break
+
+        check_protocol(protocol)
+
+
+def update_protocols(parents, project):
+    for parent in parents:
+        project._updateProtocol(parent)
+
+
+def check_protocol(protocol):
+    if protocol.isFailed():
+        print "\n>>> ERROR running protocol %s" % protocol.getRunName()
+        print "    FAILED with error: %s\n" % protocol.getErrorMessage()
+        raise Exception("ERROR launching protocol.")
 
 
 if __name__ == '__main__':
     project_name = sys.argv[1]
     workflow = sys.argv[2]
-    run(project_name, workflow)
+    if len(sys.argv) > 3:
+        timeout = int(sys.argv[3])
+    else:
+        timeout = 60*60
+    run(project_name, workflow, timeout)
