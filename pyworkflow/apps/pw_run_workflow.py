@@ -29,13 +29,13 @@ This module is responsible for running workflows from a json description.
 """
 
 from pyworkflow.manager import Manager
-import sys
 import time
 
+from optparse import OptionParser
 
-def run(name, workflow, launch_timeout):
+def run(name, workflow, launch_timeout, location):
     manager = Manager()
-    project = manager.createProject(name)
+    project = manager.createProject(name, location=location)
     protocols = project.loadProtocols(workflow)
 
     graph = project.getGraphFromRuns(protocols.values())
@@ -84,10 +84,11 @@ def check_protocol(protocol):
 
 
 if __name__ == '__main__':
-    project_name = sys.argv[1]
-    workflow = sys.argv[2]
-    if len(sys.argv) > 3:
-        timeout = int(sys.argv[3])
-    else:
-        timeout = 60*60
-    run(project_name, workflow, timeout)
+    parser = OptionParser()
+    parser.add_option("-p", "--project", dest="project_name", help="the name of the new project")
+    parser.add_option("-w", "--workflow", dest="workflow", help="the path of the workflow json")
+    parser.add_option("-t", "--timeout", dest="timeout", help="timeout for launching protocols", default=60 * 60)
+    parser.add_option("-l", "--location", dest="location", help="location of project")
+
+    (opt, args) = parser.parse_args()
+    run(opt.project_name, opt.workflow, opt.timeout, opt.location)
