@@ -25,7 +25,7 @@
 # *
 # **************************************************************************
 """
-This module is responsible for running workflows from a json description.
+This module is responsible for running workflows directly from a json description.
 """
 
 from pyworkflow.manager import Manager
