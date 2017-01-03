@@ -33,9 +33,9 @@ import time
 
 from optparse import OptionParser
 
-def run(name, workflow, launch_timeout, location):
+def run(project_name, workflow, launch_timeout, location):
     manager = Manager()
-    project = manager.createProject(name, location=location)
+    project = manager.createProject(project_name, location=location)
     protocols = project.loadProtocols(workflow)
 
     graph = project.getGraphFromRuns(protocols.values())
