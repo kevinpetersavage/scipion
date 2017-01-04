@@ -44,10 +44,11 @@ def run(project_name, workflow, launch_timeout, location):
     protocols_by_id = {protocol.strId():protocol for protocol in protocols.values()}
 
     for node in nodes:
-        protocol = protocols_by_id[node.getName()]
+        name = node.getName()
+        protocol = protocols_by_id[name]
         parents = collect_parents(node, protocols_by_id)
 
-        launch_when_ready(parents, project, protocol, launch_timeout)
+        launch_when_ready(parents, project, protocol, name, launch_timeout)
 
 
 def collect_parents(node, protocols_by_id):
@@ -55,13 +56,15 @@ def collect_parents(node, protocols_by_id):
             for parent_node in node.getParents() if not parent_node.isRoot()}
 
 
-def launch_when_ready(parents, project, protocol, launch_timeout):
+def launch_when_ready(parents, project, protocol, name, launch_timeout):
     start = time.time()
     while time.time() < start + launch_timeout:
         update_protocols(parents, project)
 
         errors = protocol.validate()
         if errors:
+            print "waiting to launch protocol " + name
+            print "current validation errors are: "
             print errors
             time.sleep(1)
         else:
@@ -84,11 +87,15 @@ def check_protocol(protocol):
 
 
 if __name__ == '__main__':
-    parser = OptionParser()
+    parser = OptionParser(usage='scipion runworkflow -p <project name> -w <workflow> -l <location of project>')
     parser.add_option("-p", "--project", dest="project_name", help="the name of the new project")
     parser.add_option("-w", "--workflow", dest="workflow", help="the path of the workflow json")
     parser.add_option("-t", "--timeout", dest="timeout", help="timeout for launching protocols", default=60 * 60)
     parser.add_option("-l", "--location", dest="location", help="location of project")
 
     (opt, args) = parser.parse_args()
+
+    if None in [opt.project_name, opt.workflow, opt.timeout, opt.location]:
+        parser.error('need to specify name, workflow, and location')
+
     run(opt.project_name, opt.workflow, opt.timeout, opt.location)
